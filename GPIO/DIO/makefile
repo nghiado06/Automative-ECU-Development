@@ -7,7 +7,7 @@ TARGET = blinkled
 CC      = arm-none-eabi-gcc
 CFLAGS  = -mcpu=cortex-m3 -mthumb -O0 -g -Wall -ffreestanding -nostdlib \
 			-ISPL/inc \
-			-ICORE \
+			-ICMSIS/Core/Include \
 			-DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER
 LDFLAGS = -T stm32f103.ld -nostdlib -Wl,--gc-sections
 
