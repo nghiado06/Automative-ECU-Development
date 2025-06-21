@@ -5,11 +5,14 @@ TARGET = blinkled
 
 # Trình biên dịch và các flags
 CC      = arm-none-eabi-gcc
-CFLAGS  = -mcpu=cortex-m3 -mthumb -O0 -g -Wall -ffreestanding -nostdlib
+CFLAGS  = -mcpu=cortex-m3 -mthumb -O0 -g -Wall -ffreestanding -nostdlib \
+			-ISPL/inc \
+			-ICORE \
+			-DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER
 LDFLAGS = -T stm32f103.ld -nostdlib -Wl,--gc-sections
 
 # Danh sách file nguồn
-SRCS_C  = main.c
+SRCS_C  = main.c $(wildcard SPL/src/*.c)
 SRCS_S  = startup_stm32f103.s
 OBJS    = $(SRCS_C:.c=.o) $(SRCS_S:.s=.o)
 
