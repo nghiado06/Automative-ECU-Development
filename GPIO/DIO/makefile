@@ -1,13 +1,13 @@
 # Makefile để build dự án Blink LED cho STM32F103 (no HAL/SPL)
 
 # Tên file đầu ra
-TARGET = blinkled
+TARGET = main
 
 # Trình biên dịch và các flags
 CC      = arm-none-eabi-gcc
 CFLAGS  = -mcpu=cortex-m3 -mthumb -O0 -g -Wall -ffreestanding -nostdlib \
 			-ISPL/inc \
-			-ICMSIS/Core/Include \
+			-ICORE \
 			-DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER
 LDFLAGS = -T stm32f103.ld -nostdlib -Wl,--gc-sections
 
@@ -41,6 +41,6 @@ flash: $(TARGET).bin
 
 # Xóa file tạm
 clean:
-	rm -f *.o *.elf *.bin
+	rm -f *.o *.elf *.bin SPL/src/*.o
 
 .PHONY: all clean flash
