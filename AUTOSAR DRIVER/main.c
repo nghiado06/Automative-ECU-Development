@@ -1,6 +1,6 @@
-#include "DIO\Dio.h"
-#include "DIO\Dio_Cfg.h"
-#include "SPL\inc\stm32f10x_rcc.h"
+#include "Dio.h"
+#include "Dio_Cfg.h"
+#include "stm32f10x_rcc.h"
 
 void delay(int time)
 {
