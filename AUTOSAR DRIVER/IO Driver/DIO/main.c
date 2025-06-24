@@ -4,9 +4,8 @@
 
 void delay(int time)
 {
-    for (int i = 0; i < time; i++)
-    {
-    }
+    for (volatile int i = 0; i < time; i++)
+        ;
 }
 
 int main()
@@ -22,12 +21,10 @@ int main()
     while (1)
     {
         Dio_WriteChannel(DIO_CHANNEL_C13, STD_LOW);
-        for (volatile int i = 0; i < 1000000; i++)
-            ;
+        delay(1000000);
 
         Dio_WriteChannel(DIO_CHANNEL_C13, STD_HIGH);
-        for (volatile int i = 0; i < 1000000; i++)
-            ;
+        delay(1000000);
     }
 
     return 0;
