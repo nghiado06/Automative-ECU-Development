@@ -43,7 +43,7 @@ Dio_LevelType Dio_ReadChannel(Dio_ChannelType ChannelId)
     }
     else
     {
-        if (GPIO_ReadInputDataBit(GPIO_Port, GPIO_Pin) == SET_BIT)
+        if (GPIO_ReadInputDataBit(GPIO_Port, GPIO_Pin) == Bit_SET)
         {
             return STD_HIGH;
         }
@@ -52,6 +52,7 @@ Dio_LevelType Dio_ReadChannel(Dio_ChannelType ChannelId)
             return STD_LOW;
         }
     }
+    return STD_LOW;
 }
 
 /********************************************************************
