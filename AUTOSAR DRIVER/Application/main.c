@@ -1,6 +1,6 @@
-#include "Dio.h"
-#include "Dio_Cfg.h"
-#include "stm32f10x_rcc.h"
+#include "DIO\Dio.h"
+#include "DIO\Dio_Cfg.h"
+#include "SPL\inc\stm32f10x_rcc.h"
 
 void delay(int time)
 {
@@ -21,10 +21,10 @@ int main()
     while (1)
     {
         Dio_WriteChannel(DIO_CHANNEL_C13, STD_LOW);
-        delay(1000000);
+        delay(100000);
 
         Dio_WriteChannel(DIO_CHANNEL_C13, STD_HIGH);
-        delay(1000000);
+        delay(100000);
     }
 
     return 0;
