@@ -117,4 +117,11 @@
  ********************************************************************/
 #define DIO_GET_PIN(ChannelId) (1 << ((ChannelId) % 16))
 
+/********************************************************************
+ * @brief   Định nghĩa macro dùng để xác định port dựa trên PortId
+ ********************************************************************/
+#define DIO_PORT(PortId) ((PortId == DIO_PORT_A) ? GPIOA : (PortId == DIO_PORT_B) ? GPIOB \
+                                                       : (PortId == DIO_PORT_C)   ? GPIOC \
+                                                                                  : GPIOD)
+
 #endif

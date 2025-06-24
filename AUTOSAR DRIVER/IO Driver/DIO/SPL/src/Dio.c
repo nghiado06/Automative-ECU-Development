@@ -98,9 +98,8 @@ void Dio_WriteChannel(Dio_ChannelType ChannelId, Dio_LevelType Level)
 Dio_PortLevelType Dio_ReadPort(Dio_PortType PortId)
 {
     GPIO_TypeDef *GPIO_Port;
-    GPIO_Port = ((PortId == DIO_PORT_A) ? GPIOA : (PortId == DIO_PORT_B) ? GPIOB
-                                              : (PortId == DIO_PORT_C)   ? GPIOC
-                                                                         : GPIOD);
+    GPIO_Port = DIO_PORT(PortId);
+
     if (GPIO_Port == NULL_PTR)
     {
         return 0;
@@ -121,9 +120,9 @@ Dio_PortLevelType Dio_ReadPort(Dio_PortType PortId)
  */
 void Dio_WritePort(Dio_PortType PortId, Dio_PortLevelType Level)
 {
-    GPIO_TypeDef *GPIO_Port = ((PortId == DIO_PORT_A) ? GPIOA : (PortId == DIO_PORT_B) ? GPIOB
-                                                            : (PortId == DIO_PORT_C)   ? GPIOC
-                                                                                       : GPIOD);
+    GPIO_TypeDef *GPIO_Port;
+    GPIO_Port = DIO_PORT(PortId);
+
     if (GPIO_Port == NULL_PTR)
     {
         return;
@@ -139,11 +138,24 @@ void Dio_WritePort(Dio_PortType PortId, Dio_PortLevelType Level)
  * @details Hàm giúp đọc mức logic của một nhóm các chân trên cùng
  *          một port
  *
- * @param   ChannelGroupIdPtr     Nhóm chân muốn đọc
+ * @param   ChannelGroupIdPtr    Nhóm chân muốn đọc
  * @return  Dio_PortLevelType    Thể hiện mức logic của các chân
  * ******************************************************************
  */
-Dio_PortLevelType Dio_ReadChannelGroup(const Dio_ChannelGroupType *ChannelGroupIdPtr);
+Dio_PortLevelType Dio_ReadChannelGroup(const Dio_ChannelGroupType *ChannelGroupIdPtr)
+{
+    GPIO_TypeDef *GPIO_Port = DIO_PORT(ChannelGroupIdPtr->port);
+    uint16 portVal = GPIO_ReadInputData(GPIO_Port);
+
+    if (GPIO_Port == NULL_PTR)
+    {
+        return 0;
+    }
+    else
+    {
+        return (Dio_PortLevelType)(((ChannelGroupIdPtr->mask) & portVal) >> ChannelGroupIdPtr->offset);
+    }
+}
 
 /********************************************************************
  * @brief   Định nghĩa hàm Dio_WriteChannelGroup
@@ -154,7 +166,28 @@ Dio_PortLevelType Dio_ReadChannelGroup(const Dio_ChannelGroupType *ChannelGroupI
  * @param   Level                 Mức logic muốn ghi
  * ******************************************************************
  */
-void Dio_WriteChannelGroup(const Dio_ChannelGroupType *ChannelGroupIdPtr, Dio_PortLevelType Level);
+void Dio_WriteChannelGroup(const Dio_ChannelGroupType *ChannelGroupIdPtr, Dio_PortLevelType Level)
+{
+    GPIO_TypeDef *GPIO_Port;
+    GPIO_Port = DIO_PORT(ChannelGroupIdPtr->port);
+
+    if (GPIO_Port == NULL_PTR)
+    {
+        return;
+    }
+    else
+    {
+        uint16_t portVal = GPIO_ReadOutputData(GPIO_Port);
+
+        // Xóa các bit được chọn trong group
+        portVal &= ~(ChannelGroupIdPtr->mask);
+
+        // Ghi level mới vào vị trí offset, đảm bảo đúng mask
+        portVal |= ((Level << ChannelGroupIdPtr->offset) & ChannelGroupIdPtr->mask);
+
+        GPIO_Write(GPIO_Port, portVal);
+    }
+}
 
 /********************************************************************
  * @brief   Định nghĩa hàm Dio_GetVersionInfo
@@ -163,7 +196,14 @@ void Dio_WriteChannelGroup(const Dio_ChannelGroupType *ChannelGroupIdPtr, Dio_Po
  * @param   VersionInfo   Thông tin phiên bản
  * ******************************************************************
  */
-void Dio_GetVersionInfo(Std_VersionInfoType *VersionInfo);
+void Dio_GetVersionInfo(Std_VersionInfoType *VersionInfo)
+{
+    VersionInfo->vendorID = 0x1234;
+    VersionInfo->moduleID = 0x5678;
+    VersionInfo->sw_major_version = 1;
+    VersionInfo->sw_minor_version = 0;
+    VersionInfo->sw_patch_version = 0;
+}
 
 /********************************************************************
  * @brief   Định nghĩa hàm Dio_FlipChannel
@@ -173,4 +213,18 @@ void Dio_GetVersionInfo(Std_VersionInfoType *VersionInfo);
  * @return  Dio_LevelType   Mức logic sau khi đảo
  * ******************************************************************
  */
-Dio_LevelType Dio_FlipChannel(Dio_ChannelType ChannelId);
+Dio_LevelType Dio_FlipChannel(Dio_ChannelType ChannelId)
+{
+    Dio_LevelType channelLevel = Dio_ReadChannel(ChannelId);
+
+    if (channelLevel == STD_HIGH)
+    {
+        Dio_WriteChannel(ChannelId, STD_LOW);
+        return STD_LOW;
+    }
+    else
+    {
+        Dio_WriteChannel(ChannelId, STD_HIGH);
+        return STD_HIGH;
+    }
+}
