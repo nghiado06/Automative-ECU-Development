@@ -1,79 +1,20 @@
 /*******************************************************************************
- * @file    Dio.h
+ * @file    Dio.c
  * @author  Do Duc Nghia
- * @brief   Digital I/O Driver Header File
- * @details File này cấu hình các kiểu dữ liệu, API theo chuẩn AUTOSAR
+ * @brief   Digital I/O Driver File
+ * @details File này định nghĩa cụ thể cho các API đã được khai báo trong header
+ *          file
  *
  * @version 1.0
  * @date    2025-06-23
  * *****************************************************************************
  */
 
-#ifndef DIO_H
-#define DIO_H
-
-/*===================== [ INCLUDE LIBRARIES ] ======================*/
-#include "Std_Types.h"
-
 /********************************************************************
- * ===================== [ AUTOSAR STANDARD ] =======================
- * @brief   Dưới đây sẽ là các API Functions theo tiêu chuẩn AUTSAR
- *          áp dụng với mọi dòng vi điều khiển 8-bit.
+ * ====================== [ INCLUDE LIBRARY ] =======================
  ********************************************************************/
-
-/********************************************************************
- * ===================== [ TYPE DEFINITIONS ] =======================
- * @brief   Định nghĩa các kiểu dữ liệu theo tiêu chuẩn AUTOSAR
- ********************************************************************/
-
-/**********************************************************************
- * @brief   Định nghĩa kiểu dữ liệu Dio_ChannelType
- * @details kiểu dữ liệu này biểu diễn một pin cụ thể của vi điều khiển
- *          - ví dụ như PA0, PC13, PB0,..
- * ********************************************************************
- */
-typedef uint8 Dio_ChannelType;
-
-/*********************************************************************
- * @brief   Định nghĩa kiểu dữ liệu Dio_PortType
- * @details kiểu dữ liệu Dio_PortType biểu diễn cho một cổng digital,
- *          tức là một nhóm chân IO (Ví dụ: Port A, Port B,..)
- * ********************************************************************
- */
-typedef uint8 Dio_PortType;
-
-/**********************************************************************
- * @brief   Định nghĩa struct Dio_ChannelGroupType
- * @details Dio_ChannelGroupType đại diện cho một nhóm nhiều chân liên
- *          tiếp nằm trên cùng một port.
- *
- * mask     Mặt nạ giúp xác định những bit nào trong port thuộc group
- * offset   Bit thấp nhất trong mask (Vị trí bắt đầu của nhóm)
- * port     Port chứa các chân trong group
- * ********************************************************************
- */
-typedef struct
-{
-    uint32 mask;
-    uint8 offset;
-    Dio_PortType port;
-} Dio_ChannelGroupType;
-
-/*********************************************************************
- * @brief   Định nghĩa kiểu dữ liệu Dio_LevelType
- * @details kiểu dữ liệu dùng để biểu diễn mức logic (HIGH/LOW) của
- *          một chân DIO hoặc một port DIO
- * ********************************************************************
- */
-typedef uint8 Dio_LevelType;
-
-/*********************************************************************
- * @brief   Định nghĩa kiểu dữ liệu Dio_PortLevelType
- * @details kiểu dữ liệu biểu diễn mức logic của toàn bộ chân trong một
- *          port
- * ********************************************************************
- */
-typedef uint8 Dio_PortLevelType;
+#include "Dio.h"
+#include "Dio_Cfg.h"
 
 /********************************************************************
  * ================= [ API FUNCTION DEFINITIONS ] ===================
@@ -84,11 +25,34 @@ typedef uint8 Dio_PortLevelType;
  * @brief   Định nghĩa hàm Dio_ReadChannel
  * @details Hàm giúp đọc mức logic của một channel
  *
- * @param   ChannelId         Channel muốn đọc
+ * @param   ChannelId        Channel muốn đọc
  * @return  Dio_LevelType    Kiểu dữ liệu thể hiện mức logic
  * ******************************************************************
  */
-Dio_LevelType Dio_ReadChannel(Dio_ChannelType ChannelId);
+Dio_LevelType Dio_ReadChannel(Dio_ChannelType ChannelId)
+{
+    GPIO_TypeDef *GPIO_Port;
+    uint16 GPIO_Pin;
+
+    GPIO_Port = DIO_GET_PORT(ChannelId);
+    GPIO_Pin = DIO_GET_PIN(ChannelId);
+
+    if (GPIO_Port == NULL_PTR)
+    {
+        return STD_LOW;
+    }
+    else
+    {
+        if (GPIO_ReadInputDataBit(GPIO_Port, GPIO_Pin) == SET_BIT)
+        {
+            return STD_HIGH;
+        }
+        else
+        {
+            return STD_LOW;
+        }
+    }
+}
 
 /********************************************************************
  * @brief   Định nghĩa hàm Dio_WriteChannel
@@ -98,7 +62,30 @@ Dio_LevelType Dio_ReadChannel(Dio_ChannelType ChannelId);
  * @param   Level             Mức logic muốn ghi
  * ******************************************************************
  */
-void Dio_WriteChannel(Dio_ChannelType ChannelId, Dio_LevelType Level);
+void Dio_WriteChannel(Dio_ChannelType ChannelId, Dio_LevelType Level)
+{
+    GPIO_TypeDef *GPIO_Port;
+    uint16 GPIO_Pin;
+
+    GPIO_Port = DIO_GET_PORT(ChannelId);
+    GPIO_Pin = DIO_GET_PIN(ChannelId);
+
+    if (GPIO_Port == NULL_PTR)
+    {
+        return;
+    }
+    else
+    {
+        if (Level == STD_HIGH)
+        {
+            GPIO_SetBits(GPIO_Port, GPIO_Pin);
+        }
+        else
+        {
+            GPIO_ResetBits(GPIO_Port, GPIO_Pin);
+        }
+    }
+}
 
 /********************************************************************
  * @brief   Định nghĩa hàm Dio_ReadPort
@@ -108,7 +95,21 @@ void Dio_WriteChannel(Dio_ChannelType ChannelId, Dio_LevelType Level);
  * @return  Dio_PortLevelType    Mức logic của các chân
  * ******************************************************************
  */
-Dio_PortLevelType Dio_ReadPort(Dio_PortType PortId);
+Dio_PortLevelType Dio_ReadPort(Dio_PortType PortId)
+{
+    GPIO_TypeDef *GPIO_Port;
+    GPIO_Port = ((PortId == DIO_PORT_A) ? GPIOA : (PortId == DIO_PORT_B) ? GPIOB
+                                              : (PortId == DIO_PORT_C)   ? GPIOC
+                                                                         : GPIOD);
+    if (GPIO_Port == NULL_PTR)
+    {
+        return 0;
+    }
+    else
+    {
+        return (Dio_PortLevelType)(GPIO_ReadInputData(GPIO_Port));
+    }
+}
 
 /********************************************************************
  * @brief   Định nghĩa hàm Dio_WritePort
@@ -118,7 +119,20 @@ Dio_PortLevelType Dio_ReadPort(Dio_PortType PortId);
  * @param   Level     Mức logic của các chân sẽ ghi
  * ******************************************************************
  */
-void Dio_WritePort(Dio_PortType PortId, Dio_PortLevelType Level);
+void Dio_WritePort(Dio_PortType PortId, Dio_PortLevelType Level)
+{
+    GPIO_TypeDef *GPIO_Port = ((PortId == DIO_PORT_A) ? GPIOA : (PortId == DIO_PORT_B) ? GPIOB
+                                                            : (PortId == DIO_PORT_C)   ? GPIOC
+                                                                                       : GPIOD);
+    if (GPIO_Port == NULL_PTR)
+    {
+        return;
+    }
+    else
+    {
+        GPIO_Write(GPIO_Port, Level);
+    }
+}
 
 /********************************************************************
  * @brief   Định nghĩa hàm Dio_ReadChannelGroup
@@ -160,5 +174,3 @@ void Dio_GetVersionInfo(Std_VersionInfoType *VersionInfo);
  * ******************************************************************
  */
 Dio_LevelType Dio_FlipChannel(Dio_ChannelType ChannelId);
-
-#endif
