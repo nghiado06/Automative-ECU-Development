@@ -6,8 +6,8 @@ CC      = arm-none-eabi-gcc
 OBJCOPY = arm-none-eabi-objcopy
 
 # ===== Directories =====
-CORE_DIR  = IO_Driver/Core
-SPL_DIR   = SPL
+CORE_DIR    = IO_Driver/Core
+SPL_DIR     = IO_Driver/SPL
 STARTUP_DIR = Startup
 
 # ===== Includes =====
@@ -19,7 +19,7 @@ CFLAGS  = -mcpu=cortex-m3 -mthumb -O0 -g -Wall -ffreestanding -nostdlib \
           -I$(CORE_DIR) \
           -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER
 
-LDFLAGS = -T stm32f103.ld -nostdlib -Wl,--gc-sections
+LDFLAGS = -T $(STARTUP_DIR)/stm32f103.ld -nostdlib -Wl,--gc-sections
 
 # ===== Sources =====
 SRCS_C  = main.c \
@@ -28,10 +28,9 @@ SRCS_C  = main.c \
           $(wildcard $(CORE_DIR)/PORT/*.c) \
           $(wildcard $(CORE_DIR)/PWM/*.c)
 
-
 SRCS_S  = $(STARTUP_DIR)/startup_stm32f103.s
 
-OBJS   = $(SRCS_C:.c=.o) $(SRCS_S:.s=.o)
+OBJS    = $(SRCS_C:.c=.o) $(SRCS_S:.s=.o)
 
 # ===== Targets =====
 all: $(TARGET).bin
