@@ -17,6 +17,7 @@ Nội dung kiến thức:
 - Byte là tập hợp của 8 bit.
 - Một byte có thể biểu diễn 256 giá trị khác nhau (từ 00000000 = 0 đến 11111111 = 255).
 - Đây là đơn vị cơ bản để máy tính xử lý dữ liệu (ký tự, màu, số,...).
+- Một byte tương ứng với một số nguyên trong khoảng từ 0 đến 255 trong hệ 10.
 
 # 2. LÀM QUEN VỚI CÁC HỆ CHỮ SỐ
 Chúng ta sẽ cùng nhau tìm hiểu về cách tính toán cũng như chuyển đổi giữa các hệ với nhau.
@@ -61,9 +62,33 @@ Thập phân:      0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  1
 ![alt text](image-4.png)
 
 # 3. CÁCH BIỂU DIỄN BIT TRONG VI ĐIỀU KHIỂN
-- Trong lập trình thanh ghi chắc hẳn khi mọi người đọc datasheet sẽ không lạ với các địa chỉ thanh ghi hay cách thanh ghi tổ chức dưới dạng các bit như này:
+- Trước tiên, nói sơ qua về cách biểu diễn hệ 16 và hệ nhị phân trong datasheet.
+  - Hệ 16 sẽ được biểu diễn là 0x****
+  - Hệ nhị phận sẽ được biểu diễn là 0b****
+- Vậy thì, trong lập trình thanh ghi chắc chắn khi mọi người đọc datasheet sẽ phải làm quen với các địa chỉ thanh ghi hay cách thanh ghi tổ chức dưới dạng các bit như này:
+
+![alt text](image-6.png)
 
 ![alt text](image-5.png)
 
-![alt text](image-6.png)
+
+- Đó là cách mà các thanh ghi ghi bit để xác định các chức năng, cũng địa chỉ là các mà chúng ta căn cứ, xác định thanh ghi để mà lập trình. Khi này hẳn sẽ có rất nhiều bạn gặp rắc rối với đọc datasheet cũng như nắm cách các bit, địa chỉ này hoạt động.
+- Nhưng mình sẽ làm rõ với các bạn như này, đó là chúng ta cần phân biệt hai khái niệm **"biểu diễn"** và **"giá trị"**.
+- Nói rõ hơn, thì việc trình bày địa chỉ, hay tổ chức thanh ghi dưới dạng bit này là một cách **"biểu diễn"** có logic và dễ hệ thống hóa hơn. Nhưng tất cả về bản chất thì chúng nó đều là một **"giá trị"** cụ thể và duy nhất ở hệ 10.
+**- Lấy ví dụ:**
+  - Ta có địa chỉ PORT GPIOA là 0x4001 0800 (hệ 16), thì giá trị của nó trong hệ 10 là 1073809408. Vậy khi này ta nói ứng với địa chỉ của thanh ghi GPIOA đó chính là giá trị 1073809408 được biểu diễn thành 0x4001 0800 trong hệ 16. Và port A này có địa chỉ kết thúc là 0x4001 0BFF tương ứng với 1073810431 hệ 10. Ta thực hiện phép toán trừ đi 1073810431 - 1073809408 + 1, thì ta nói vùng nhớ của Port GPIOA này chiếm 1024 số tương ứng với 1024 byte hay là độ dời của nó là 0x03FF byte.<br>
+
+  - Lấy ví dụ khác, tương tự cho cấu hình của một thanh ghi, chẳng hạn như thanh ghi GPIOx_CRL nằm trong Port GPIOA, có địa chỉ là từ
+  0x4001 - 0x4004, vậy dung lượng của thanh ghi này là 4 byte tương đương với 32 bit, vậy thì ta hoàn toàn có thể biểu diễn nó dạng logic là các bit nhị phân từ bit 0 đến bit 31 như này: 0b0000 0000 0000 0000 0000 0000 0000 0000.Và ta sẽ thao tác với các bit trên đây, mỗi một bit ở các vị trí sẽ có một chức năng cụ thể, chẳng hạn kích hoạt chức năng A là 0b0001 0000 0000 0000 0000 0000 0000 0000
+  ; chức năng B là: 0001 0010 0000 0000 0000 0000 0000 0000. Nó sẽ hoạt động như thế, nhưng về bản chất ở thanh ghi này mỗi chức năng đó dù được biểu diễn dưới dạng nhị phân nhưng thực chất là chúng sẽ tương ứng với một con số hệ 10.
+
+  --> Từ 2 ví dụ trên ta sẽ đúc kết được rằng: các địa chỉ, cấu hình thanh ghi, thực chất là một giá trị hệ 10 ở mảng đó. Và giá trị này là duy nhất và được biểu diễn một cách có logic ở các hệ sao cho phù hợp. Ví dụ như ta nói: ***"Biểu diễn địa chỉ thanh ghi - Hệ 16 - Giá trị bắt đầu từ 0 đến 1 tỷ - Mỗi một giá trị tương ứng với một địa chỉ"*** ***"Biểu diễn cấu hình thanh ghi - Hệ 2 - Giá trị từ 0 đến 1 triệu - Mỗi một giá trị tương ứng với 1 chức năng được kích hoạt"***.
+
+# 4. THAO TÁC VỚI BIT
+- Sau khi đã tìm hiểu qua về bản chất của bit byte trong vi điều khiển, bây giờ ta hãy cùng tìm hiểu về các phép logic để có thể thao tác bit byte.
+
+
+
+
+
 
