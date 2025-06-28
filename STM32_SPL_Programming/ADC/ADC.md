@@ -740,23 +740,94 @@ ADC_InitStructure.ADC_NbrOfChannel = 1;
 ADC_Init(ADC1, &ADC_InitStructure);
 ```
 
+Dưới đây là bảng mô tả **các lựa chọn cấu hình cơ bản của ADC** thông qua struct `ADC_InitTypeDef` trong STM32F1, giúp bạn hiểu rõ từng thành phần, giá trị và ý nghĩa của chúng:
+
+## Bảng mô tả cấu hình ADC
+
+| Trường cấu hình          | Giá trị khả dụng                              | Ý nghĩa                                                                                     |
+| ------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `ADC_Mode`               | `ADC_Mode_Independent`                        | ADC hoạt động độc lập. Đây là chế độ phổ biến nhất cho ADC đơn lẻ.                          |
+|                          | `ADC_Mode_RegInjecSimult`                     | Regular và Injected đo cùng lúc (chỉ dùng khi có nhiều ADC).                                |
+|                          | `ADC_Mode_InjecSimult_FastInterl`, v.v.       | Các mode dùng khi có **2 ADC** hoạt động song song (ADC1 & ADC2) – cho ứng dụng tốc độ cao. |
+| `ADC_ScanConvMode`       | `ENABLE`                                      | Cho phép quét nhiều kênh ADC trong 1 lần convert (cần cấu hình SQRx nhiều kênh).            |
+|                          | `DISABLE`                                     | Chỉ đo 1 kênh.                                                                              |
+| `ADC_ContinuousConvMode` | `ENABLE`                                      | ADC sẽ liên tục convert sau mỗi lần đo xong – thường dùng cho đo liên tục.                  |
+|                          | `DISABLE`                                     | Chỉ đo 1 lần khi được trigger hoặc gọi bằng phần mềm.                                       |
+| `ADC_ExternalTrigConv`   | `ADC_ExternalTrigConv_T1_CC1`, `T2_CC2`, v.v. | Chọn nguồn trigger từ timer cụ thể (TIMx_CHy, TIMx_TRGO, EXTI, ...) để bắt đầu chuyển đổi.  |
+|                          | `ADC_ExternalTrigConv_None`                   | Không dùng trigger ngoài, dùng phần mềm gọi thủ công (`SWSTART`).                           |
+| `ADC_DataAlign`          | `ADC_DataAlign_Right`                         | Kết quả convert căn phải trong thanh ghi `ADC_DR`.                                          |
+|                          | `ADC_DataAlign_Left`                          | Kết quả dịch trái sang bit cao trong `ADC_DR`.                                              |
+| `ADC_NbrOfChannel`       | Số nguyên từ 1–16                             | Số lượng kênh ADC cần đo trong 1 chuỗi (tương ứng số SQx trong SQRx).                       |
+
+---
+
+## Gợi ý thực tế
+
+- Nếu bạn chỉ đo 1 tín hiệu đơn → `ScanConvMode = DISABLE`, `NbrOfChannel = 1`.
+- Nếu đo nhiều cảm biến → `ScanConvMode = ENABLE`, `NbrOfChannel = số kênh`, cấu hình thêm `SQRx`.
+- Nếu dùng trigger từ timer (ví dụ lấy mẫu đều đặn 1ms) → dùng `ExternalTrigConv = ADC_ExternalTrigConv_T3_TRGO` (chẳng hạn).
+
 ### 3. Chọn kênh ADC cần đo
+
+Khi sử dụng ADC trong STM32, sau khi đã cấu hình ADC cơ bản, bước tiếp theo là chọn **kênh ADC cần đo**. STM32 cho phép đo 1 hoặc nhiều kênh, sắp xếp theo trật tự từ SQ1 đến SQ16.
+
+Việc chọn kênh và đặt vào dãy chuyển đổi (conversion sequence) được thực hiện qua hàm:
 
 ```c
 ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_55Cycles5);
 ```
 
-### 4. Bật ADC và thực hiện hiệu chuẩn
+#### Cấu trúc và ý nghĩa tham số
+
+| Tham số            | Vai trò                                | Lựa chọn / Giải thích                                                                         |
+| ------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `ADC1`             | Bộ ADC sử dụng                         | ADC1, ADC2 (STM32F103)                                                                        |
+| `ADC_Channel_x`    | Channel cần đo (ADC\_INx)              | Từ `ADC_Channel_0` đến `ADC_Channel_17`, hoặc `ADC_Channel_TempSensor`, `ADC_Channel_Vrefint` |
+| `Rank`             | Vị trí trong chuỗi chuyển đổi (1→16)   | Mà kênh sẽ được chuyển đổi theo thứ tự tương ứng SQ1 → SQ16                                   |
+| `ADC_SampleTime_x` | Thời gian lấy mẫu trước khi chuyển đổi | `1.5`, `7.5`, ..., `239.5` chu kỳ clock ADC                                                   |
+
+#### Ghi chú:
+
+- Mỗi channel đều phải được khai báo và gán vị trí trong chuỗi.
+- Thời gian lấy mẫu càng dài → kết quả càng đối với tín hiệu trở cao.
+
+#### Ví dụ:
+
+Đo liên tiếp 3 kênh ADC: IN3, IN5, IN10:
 
 ```c
-ADC_Cmd(ADC1, ENABLE);
-
-ADC_ResetCalibration(ADC1);
-while(ADC_GetResetCalibrationStatus(ADC1));
-
-ADC_StartCalibration(ADC1);
-while(ADC_GetCalibrationStatus(ADC1));
+ADC_RegularChannelConfig(ADC1, ADC_Channel_3, 1, ADC_SampleTime_55Cycles5);
+ADC_RegularChannelConfig(ADC1, ADC_Channel_5, 2, ADC_SampleTime_55Cycles5);
+ADC_RegularChannelConfig(ADC1, ADC_Channel_10, 3, ADC_SampleTime_55Cycles5);
 ```
+
+---
+
+### 4. Bật ADC và thực hiện hiệu chuẩn (Calibration)
+
+Trước khi đo, cần:
+
+- Bật ADC
+- Thực hiện reset calibration
+- Thực hiện hiệu chuẩn (calibration)
+
+```c
+ADC_Cmd(ADC1, ENABLE); // Bật ADC
+
+ADC_ResetCalibration(ADC1); // Reset
+while(ADC_GetResetCalibrationStatus(ADC1)); // Đợi xong
+
+ADC_StartCalibration(ADC1); // Bắt đầu hiệu chuẩn
+while(ADC_GetCalibrationStatus(ADC1)); // Đợi hoàn thành
+```
+
+#### Tại sao cần calibration?
+
+| Mục đích                   | Giải thích                                                     |
+| -------------------------- | -------------------------------------------------------------- |
+| Loại bỏ sai số của ADC     | Sai số do linh kiện analog bên trong chip                      |
+| Cải thiện độ chính xác     | Hiệu chuẩn giúp kết quả ADC ổn định và ít bị nhiễu hơn         |
+| Bắt buộc sau khi reset ADC | Mỗi khi reset chip hoặc khởi động lại thì phải calibration lại |
 
 ---
 
@@ -787,22 +858,41 @@ ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
 
 ---
 
-## Bắt đầu chuyển đổi
+### 5. Bắt đầu chuyển đổi và đọc giá trị ADC
+
+Sau khi đã khai báo kênh và hiệu chuẩn xong, ta bắt đầu đo ADC.
+
+#### Trường hợp 1 kênh regular (không scan mode):
 
 ```c
 ADC_SoftwareStartConvCmd(ADC1, ENABLE);
+while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC));
+uint16_t value = ADC_GetConversionValue(ADC1);
 ```
+
+#### Trường hợp đo nhiều kênh (scan mode):
+
+Khi đã cấu hình ADC\_ScanConvMode = ENABLE, ADC sẽ lần lượt đo các kênh SQ1 → SQx theo số lượng khai báo.
+
+Khi đo xong toàn bộ sequence, ADC\_FLAG\_EOC sẽ được set.
+
+Sau đó, có thể:
+
+- Đọc ADC1->DR ngay sau mỗi lần EOC
+- Hoặc dùng DMA để chuyển toàn bộ dữ liệu vào RAM
+
+#### Ví dụ đo 3 kênh, dùng polling:
+
+```c
+for (int i = 0; i < 3; i++) {
+    ADC_SoftwareStartConvCmd(ADC1, ENABLE);
+    while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC));
+    buffer[i] = ADC_GetConversionValue(ADC1);
+}
+```
+
+> Để tối ưu hoá, nên sử dụng DMA khi đo nhiều kênh.
 
 ---
 
-## Tổng kết các bước chính
-
-| Bước | Mô tả                                    |
-| ---- | ---------------------------------------- |
-| 1    | Bật Clock cho GPIO và ADC                |
-| 2    | Cấu hình chân ADC là Analog input        |
-| 3    | Cấu hình ADC: mode, trigger, align, scan |
-| 4    | Chọn kênh ADC và thời gian lấy mẫu       |
-| 5    | Bật ADC và hiệu chuẩn                    |
-| 6    | Bắt đầu chuyển đổi hoặc bật trigger      |
-
+Trên đây là quy trình hoàn chỉnh từ cài đặt đến đọc giá trị ADC trong STM32 SPL.
