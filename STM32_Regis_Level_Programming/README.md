@@ -7,7 +7,7 @@
   - Bắt đầu code, lập trình thanh ghi
 
 # THAO TÁC BIT BYTE
-- Nội dung về thao tác bit/byte các bạn có thể tìm hiểu thêm ở đây [docs](Bit Byte Manipulation/).
+- Nội dung về thao tác bit/byte các bạn có thể tìm hiểu thêm ở đây [Bit Byte Manipulation](<../Bit Byte Manipulation/Bit Byte Manipulation.md>).
 - Thao tác bit byte là một khái niệm cơ bản mà chúng ta cần phải nắm khi lập trình thanh ghi bởi vì thanh ghi bản chất sẽ là
 thao tác với địa chỉ của chúng.
 - 
