@@ -856,6 +856,8 @@ NVIC_Init(&NVIC_InitStructure);
 ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
 ```
 
+Các bạn có thể tìm hiểu kỹ hơn về ngắt ở đây [Interrupt](../INTERRUPT/Interrupt.md)
+
 ---
 
 ### 5. Bắt đầu chuyển đổi và đọc giá trị ADC
