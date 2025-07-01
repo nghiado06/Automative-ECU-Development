@@ -557,7 +557,7 @@ NVIC giúp hệ thống xử lý ngắt một cách hiệu quả và phản ứn
 - Thiết lập giá trị Auto Reload (ARR) để định nghĩa chu kỳ đếm.
 - Bật Timer và enable ngắt nếu cần.
 
-Nội dung sâu hơn về Timer chúng ta sẽ cùng tìm hiểu ở một phần khác.
+Nội dung sâu hơn về Timer mọi người có thể đọc ở đây [PWM](../PWM/PWM.md).
 
 ---
 
@@ -577,7 +577,7 @@ Nội dung sâu hơn về Timer chúng ta sẽ cùng tìm hiểu ở một phầ
 - Chế độ hoạt động: Normal, Circular, hoặc Burst.
 - Bật DMA và enable ngắt nếu cần.
 
-Nội dung về DMA này chúng ta cũng sẽ tìm hiểu sâu hơn ở một dịp khác nhé.
+Nội dung về DMA này mọi người có thể đọc kỹ hơn ở đây [DMA](../DMA/DMA.md).
 
 # PHẦN 3: PHÂN TÍCH TỪNG BƯỚC HOẠT ĐỘNG CỦA ADC 
 
