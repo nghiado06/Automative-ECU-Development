@@ -17,6 +17,12 @@
 
 #define ADC_INVALID_GROUP ((Adc_GroupType)0xFF)
 
+#define ADC_VENDOR_ID 1234
+#define ADC_MODULE_ID 5678
+#define ADC_SW_MAJOR_VERSION 1
+#define ADC_SW_MINOR_VERSION 0
+#define ADC_SW_PATCH_VERSION 0
+
 /********************************************************************
  * ==================== [ INTERNAL DEFINITIONS ] ====================
  * @brief   Định nghĩa các cấu hình hỗ trợ
@@ -120,7 +126,7 @@ static void Adc_HandleConversionComplete(Adc_GroupType group, uint16 rawValue)
 /*************************************************************************************
  * @brief   Hàm ISR cho ADC
  *************************************************************************************/
-static void ADC1_2_IRQHandler(void)
+void ADC1_2_IRQHandler(void)
 {
     if (ADC_GetITStatus(ADC1, ADC_IT_EOC))
     {
@@ -180,29 +186,31 @@ static void Adc_Dma_Config(Adc_GroupType group)
 
     ADC_DMACmd(adc, ENABLE);
 
+    Adc_DmaNvic_Config(); // Cấu hình NVIC cho DMA;
+
     NVIC_EnableIRQ(DMA1_Channel1_IRQn); // Bật ngắt DMA
 
     DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, ENABLE); // Bật ngắt chuyển hoàn thành
 }
 
-static void DMA1_Channel1_IRQHandler(void)
+/*************************************************************************************
+ * @brief   Hàm xử lý ngắt DMA Channel 1
+ * @details Hàm này được gọi khi DMA hoàn thành chuyển đổi và gửi dữ liệu về ADC.
+ *          Nó sẽ cập nhật trạng thái của group và gọi callback nếu có.
+ *************************************************************************************/
+void DMA1_Channel1_IRQHandler(void)
 {
-    // Kiểm tra xem DMA đã hoàn thành chuyển đổi chưa
     if (DMA_GetITStatus(DMA1_IT_TC1))
     {
         DMA_ClearITPendingBit(DMA1_IT_TC1);
+        DMA_Cmd(DMA1_Channel1, DISABLE);
+        ADC_DMACmd(ADC1, DISABLE);
 
-        DMA_Cmd(DMA1_Channel1, DISABLE); // Dừng DMA
-
-        ADC_DMACmd(ADC1, DISABLE); // Dừng ADC DMA
-
-        // Giả sử group 0 đang sử dụng DMA1_Channel1
         Adc_GroupType group = adcActiveGroupId[ADC_1];
         if (group != ADC_INVALID_GROUP)
         {
             adcGroupStatus[group] = ADC_COMPLETED;
 
-            // Gọi callback nếu có
             const Adc_GroupConfigType *cfg = &Adc_Config.groupConfigPtr[group];
             if (adcGroupNotificationEnabled[group] && cfg->notification != NULL_PTR)
             {
@@ -210,6 +218,21 @@ static void DMA1_Channel1_IRQHandler(void)
             }
         }
     }
+}
+
+/*************************************************************************************
+ * @brief   Hàm cấu hình NVIC cho DMA
+ * @details Cấu hình NVIC để nhận ngắt từ DMA Channel 1, thường dùng cho ADC.
+ *************************************************************************************/
+static void Adc_DmaNvic_Config(void)
+{
+    NVIC_InitTypeDef NVIC_InitStruct;
+    NVIC_InitStruct.NVIC_IRQChannel = DMA1_Channel1_IRQn;
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
+
+    NVIC_Init(&NVIC_InitStruct);
 }
 
 /*************************************************************************************
@@ -401,6 +424,7 @@ void Adc_StartGroupConversion(Adc_GroupType group)
     if (groupConf->readMode == ADC_READ_MODE_INTERRUPT)
     {
         Adc_Nvic_Config(groupConf->hwUnit);
+        NVIC_EnableIRQ(ADC1_2_IRQn); // Bật ngắt ADC1 và ADC2
         ADC_ITConfig(adcx, ADC_IT_EOC, ENABLE);
     }
 
@@ -539,6 +563,26 @@ Std_ReturnType Adc_GetStreamLastPointer(Adc_GroupType group, Adc_ValueGroupType 
  ******************************************************************************/
 void Adc_EnableHardwareTrigger(Adc_GroupType group)
 {
+    if (group >= ADC_MAX_GROUPS)
+        return;
+
+    const Adc_GroupConfigType *groupCfg = &Adc_Config.groupConfigPtr[group];
+    ADC_TypeDef *adcx = groupCfg->hwUnit == ADC_1 ? ADC1 : ADC2;
+
+    // Kiểm tra xem group có hỗ trợ trigger phần cứng không
+    if (groupCfg->triggerSource != ADC_TRIGG_SRC_HW)
+        return;
+
+    // Cấu hình trigger
+    ADC_ExternalTrigConvCmd(adcx, ENABLE);
+    ADC_ExternalTrigConvConfig(adcx, groupCfg->hwTriggerSignal);
+
+    // Bật ngắt nếu cần
+    if (groupCfg->readMode == ADC_READ_MODE_INTERRUPT)
+    {
+        NVIC_EnableIRQ(ADC1_2_IRQn);
+        ADC_ITConfig(adcx, ADC_IT_EOC, ENABLE);
+    }
 }
 
 /*******************************************************************************
@@ -547,6 +591,22 @@ void Adc_EnableHardwareTrigger(Adc_GroupType group)
  ******************************************************************************/
 void Adc_DisableHardwareTrigger(Adc_GroupType group)
 {
+    if (group >= ADC_MAX_GROUPS)
+        return;
+
+    const Adc_GroupConfigType *groupCfg = &Adc_Config.groupConfigPtr[group];
+    ADC_TypeDef *adcx = groupCfg->hwUnit == ADC_1 ? ADC1 : ADC2;
+
+    // Kiểm tra xem group có hỗ trợ trigger phần cứng không
+    if (groupCfg->triggerSource != ADC_TRIGG_SRC_HW)
+        return;
+
+    // Tắt trigger
+    ADC_ExternalTrigConvCmd(adcx, DISABLE);
+    ADC_ITConfig(adcx, ADC_IT_EOC, DISABLE);
+
+    // Tắt ngắt nếu không cần nữa
+    NVIC_DisableIRQ(ADC1_2_IRQn);
 }
 
 /*******************************************************************************
@@ -555,4 +615,12 @@ void Adc_DisableHardwareTrigger(Adc_GroupType group)
  ******************************************************************************/
 void Adc_GetVersionInfo(Std_VersionInfoType *versioninfo)
 {
+    if (versioninfo == NULL_PTR)
+        return;
+
+    versioninfo->vendorID = ADC_VENDOR_ID;
+    versioninfo->moduleID = ADC_MODULE_ID;
+    versioninfo->sw_major_version = ADC_SW_MAJOR_VERSION;
+    versioninfo->sw_minor_version = ADC_SW_MINOR_VERSION;
+    versioninfo->sw_patch_version = ADC_SW_PATCH_VERSION;
 }
