@@ -3,6 +3,7 @@
 #include "stm32f10x_rcc.h"
 #include "Port.h"
 #include "Port_Cfg.h"
+#include "Adc.h"
 
 void delay(int time)
 {

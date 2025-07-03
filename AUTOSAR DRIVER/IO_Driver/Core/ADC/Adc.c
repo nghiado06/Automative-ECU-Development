@@ -4,6 +4,7 @@
  * @brief   ADC Driver Source File
  * @details Cung cấp các API điều khiển ADC theo chuẩn AUTOSAR, bao gồm khởi tạo,
  *          điều khiển chuyển đổi, đọc dữ liệu và quản lý thông báo.
+ * @note    File này đang cấu hình ADC dạng Polling, chưa áp dụng Ngắt hay DMA
  *
  * @version 1.0
  * @date    2025-06-28
@@ -13,6 +14,8 @@
  * ====================== [ INCLUDE LIBRARY ] =======================
  ********************************************************************/
 #include "Adc.h"
+
+#define ADC_INVALID_GROUP ((Adc_GroupType)0xFF)
 
 /********************************************************************
  * ==================== [ INTERNAL DEFINITIONS ] ====================
@@ -30,7 +33,7 @@ static Adc_StatusType adcGroupStatus[ADC_MAX_GROUPS] = {ADC_IDLE};
 
 /*******************************************************************************
  * @brief   Mảng boolean để theo dõi trạng thái callback của từng group
- * @details TRUE nếu callback của group đó đã được bật bằng Adc_EnableGroupNotification().
+ * @details TRUE nếu callback của group đó đã được bật.
  *******************************************************************************/
 static boolean adcGroupNotificationEnabled[ADC_MAX_GROUPS] = {FALSE};
 
@@ -39,7 +42,19 @@ static boolean adcGroupNotificationEnabled[ADC_MAX_GROUPS] = {FALSE};
  * @details Được cập nhật mỗi lần ADC ghi một mẫu vào buffer.
  *          Chỉ có tác dụng với group có accessMode là STREAMING.
  *******************************************************************************/
-static uint16 adcSampleIndex[ADC_MAX_GROUPS] = {0};
+static uint16 adcSampleIndex[ADC_MAX_SAMPLES] = {0};
+
+/*******************************************************************************
+ * @brief   Bộ nhớ lưu trạng thái của group
+ *******************************************************************************/
+static Adc_GroupType adcActiveGroupId[2] = {ADC_INVALID_GROUP, ADC_INVALID_GROUP};
+
+/*******************************************************************************
+ * @brief   Bộ nhớ của từng group
+ *******************************************************************************/
+static Adc_ValueGroupType buffer_group_0[15]; // Điều chỉnh được số phần tử: phần tử = mẫu x số kênh
+static Adc_ValueGroupType buffer_group_1[15];
+static Adc_ValueGroupType buffer_group_2[15];
 
 /********************************************************************
  * =============== [ INTERNAL FUNCTION DEFINITIONS ] ================
@@ -99,6 +114,93 @@ static void Adc_HandleConversionComplete(Adc_GroupType group, uint16 rawValue)
             cfg->notification();
         }
     }
+    adcActiveGroupId[cfg->hwUnit] = ADC_INVALID_GROUP;
+}
+
+/*************************************************************************************
+ * @brief   Hàm ISR cho ADC
+ *************************************************************************************/
+static void ADC_1_2_IRQHandler(void)
+{
+    if (ADC_GetITStatus(ADC1, ADC_IT_EOC))
+    {
+        ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
+
+        Adc_GroupType group = adcActiveGroupId[ADC_1];
+        if (group != ADC_INVALID_GROUP)
+        {
+            uint16 raw = ADC_GetConversionValue(ADC1);
+            Adc_HandleConversionComplete(group, raw);
+        }
+    }
+
+    // Nếu có ADC2:
+    if (ADC_GetITStatus(ADC2, ADC_IT_EOC))
+    {
+        ADC_ClearITPendingBit(ADC2, ADC_IT_EOC);
+
+        Adc_GroupType group = adcActiveGroupId[ADC_2];
+        if (group != ADC_INVALID_GROUP)
+        {
+            uint16 raw = ADC_GetConversionValue(ADC2);
+            Adc_HandleConversionComplete(group, raw);
+        }
+    }
+}
+
+/*************************************************************************************
+ * @brief   Hàm cấu hình sử dụng DMA
+ *************************************************************************************/
+static void Adc_Dma_Config(Adc_GroupType group)
+{
+    const Adc_GroupConfigType *cfg = &Adc_Config.groupConfigPtr[group];
+    ADC_TypeDef *adc = getInstance(cfg->hwUnit);
+
+    // Giả sử: bạn có adcGroupBuffers[group] là buffer đã gán
+    DMA_InitTypeDef DMA_InitStructure;
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+
+    DMA_DeInit(DMA1_Channel1); // Tùy channel ADCx gắn vào DMA channel nào
+
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(adc->DR);
+    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)adcGroupBuffers[group];
+    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+    DMA_InitStructure.DMA_BufferSize = cfg->numSamples * cfg->numberOfChannels;
+    DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+    DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+    DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+    DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+    DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+
+    DMA_Init(DMA1_Channel1, &DMA_InitStructure);
+
+    DMA_Cmd(DMA1_Channel1, ENABLE);
+    ADC_DMACmd(adc, ENABLE);
+}
+
+/*************************************************************************************
+ * @brief   Hàm cấu hình sử dụng Ngắt
+ *************************************************************************************/
+static void Adc_Nvic_Config(Adc_HwUnitType hwUnit)
+{
+    NVIC_InitTypeDef NVIC_InitStruct;
+    NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 1;
+
+    switch (hwUnit)
+    {
+    case ADC_1:
+    case ADC_2:
+        NVIC_InitStruct.NVIC_IRQChannel = ADC1_2_IRQn;
+        break;
+    default:
+        return;
+    }
+
+    NVIC_Init(&NVIC_InitStruct);
 }
 
 /********************************************************************
@@ -240,9 +342,14 @@ Std_ReturnType Adc_SetupResultBuffer(Adc_GroupType group, Adc_ValueGroupType *Da
  ******************************************************************************/
 void Adc_StartGroupConversion(Adc_GroupType group)
 {
-
     const Adc_GroupConfigType *groupConf = &Adc_Config.groupConfigPtr[group];
     ADC_TypeDef *adcx = getInstance(groupConf->hwUnit);
+
+    // Reset lại vị trí lưu sample
+    adcSampleIndex[group] = 0;
+
+    // Set trạng thái hoạt động cho group
+    adcActiveGroupId[groupConf->hwUnit] = group;
 
     for (uint8 ch = 0; ch < groupConf->numberOfChannels; ++ch)
     {
@@ -250,6 +357,19 @@ void Adc_StartGroupConversion(Adc_GroupType group)
                                  groupConf->channelList[ch],
                                  ch + 1,
                                  groupConf->samplingTime);
+    }
+
+    // Nếu dùng DMA
+    if (groupConf->transferMode == ADC_TRANSFER_MODE_DMA)
+    {
+        Adc_Dma_Config(group);
+    }
+
+    // Nếu dùng ngắt
+    if (groupConf->readMode == ADC_READ_MODE_INTERRUPT)
+    {
+        Adc_Nvic_Config(groupConf->hwUnit);
+        ADC_ITConfig(adcx, ADC_IT_EOC, ENABLE);
     }
 
     ADC_SoftwareStartConvCmd(adcx, ENABLE);
@@ -311,96 +431,96 @@ Std_ReturnType Adc_ReadGroup(Adc_GroupType group, Adc_ValueGroupType *DataBuffer
         // Gọi xử lý STREAMING
         Adc_HandleConversionComplete(group, rawValue);
         adcGroupStatus[group] = ADC_COMPLETED;
-
-        return E_OK;
     }
+    return E_OK;
+}
 
-    /*******************************************************************************
-     * @brief   Lấy trạng thái hiện tại của một group
-     * @param   group   Group cần kiểm tra
-     * @return  Adc_StatusType (IDLE, BUSY, COMPLETED, ...)
-     ******************************************************************************/
-    Adc_StatusType Adc_GetGroupStatus(Adc_GroupType group)
-    {
-        if (group >= ADC_MAX_GROUPS)
-            return ADC_IDLE;
+/*******************************************************************************
+ * @brief   Lấy trạng thái hiện tại của một group
+ * @param   group   Group cần kiểm tra
+ * @return  Adc_StatusType (IDLE, BUSY, COMPLETED, ...)
+ ******************************************************************************/
+Adc_StatusType Adc_GetGroupStatus(Adc_GroupType group)
+{
+    if (group >= ADC_MAX_GROUPS)
+        return ADC_IDLE;
 
-        return adcGroupStatus[group];
-    }
+    return adcGroupStatus[group];
+}
 
-    /*******************************************************************************
-     * @brief   Cho phép gọi callback khi group chuyển đổi xong
-     * @param   group   Group cần bật notification
-     ******************************************************************************/
-    void Adc_EnableGroupNotification(Adc_GroupType group)
-    {
-        if (group >= ADC_MAX_GROUPS)
-            return;
+/*******************************************************************************
+ * @brief   Cho phép gọi callback khi group chuyển đổi xong
+ * @param   group   Group cần bật notification
+ ******************************************************************************/
+void Adc_EnableGroupNotification(Adc_GroupType group)
+{
+    if (group >= ADC_MAX_GROUPS)
+        return;
 
-        // Gán cờ kích hoạt notification
-        adcGroupNotificationEnabled[group] = TRUE;
-    }
+    // Gán cờ kích hoạt notification
+    adcGroupNotificationEnabled[group] = TRUE;
+}
 
-    /*******************************************************************************
-     * @brief   Tắt callback khi group chuyển đổi xong
-     * @param   group   Group cần tắt notification
-     ******************************************************************************/
-    void Adc_DisableGroupNotification(Adc_GroupType group)
-    {
-        if (group >= ADC_MAX_GROUPS)
-            return;
+/*******************************************************************************
+ * @brief   Tắt callback khi group chuyển đổi xong
+ * @param   group   Group cần tắt notification
+ ******************************************************************************/
+void Adc_DisableGroupNotification(Adc_GroupType group)
+{
+    if (group >= ADC_MAX_GROUPS)
+        return;
 
-        // Xóa cờ kích hoạt notification
-        adcGroupNotificationEnabled[group] = FALSE;
-    }
+    // Xóa cờ kích hoạt notification
+    adcGroupNotificationEnabled[group] = FALSE;
+}
 
-    /*******************************************************************************
-     * @brief   Lấy con trỏ tới mẫu cuối cùng trong buffer streaming
-     * @param   group             Group cần kiểm tra
-     * @param   PtrToSamplePtr    Con trỏ tới con trỏ mẫu cuối cùng
-     * @return  Std_ReturnType    E_OK nếu thành công, E_NOT_OK nếu group chưa chạy
-     ******************************************************************************/
-    Std_ReturnType Adc_GetStreamLastPointer(Adc_GroupType group, Adc_ValueGroupType * *PtrToSamplePtr)
-    {
-        if (group >= ADC_MAX_GROUPS || PtrToSamplePtr == NULL_PTR)
-            return E_NOT_OK;
+/*******************************************************************************
+ * @brief   Lấy con trỏ tới mẫu cuối cùng trong buffer streaming
+ * @param   group             Group cần kiểm tra
+ * @param   PtrToSamplePtr    Con trỏ tới con trỏ mẫu cuối cùng
+ * @return  Std_ReturnType    E_OK nếu thành công, E_NOT_OK nếu group chưa chạy
+ ******************************************************************************/
+Std_ReturnType Adc_GetStreamLastPointer(Adc_GroupType group, Adc_ValueGroupType **PtrToSamplePtr)
+{
+    if (group >= ADC_MAX_GROUPS || PtrToSamplePtr == NULL_PTR)
+        return E_NOT_OK;
 
-        const Adc_GroupConfigType *groupCfg = &Adc_Config.groupConfigPtr[group];
+    const Adc_GroupConfigType *groupCfg = &Adc_Config.groupConfigPtr[group];
 
-        // Kiểm tra xem group đó có đang ở chế độ STREAMING không
-        if (groupCfg->accessMode != ADC_ACCESS_MODE_STREAMING)
-            return E_NOT_OK;
+    // Kiểm tra xem group đó có đang ở chế độ STREAMING không
+    if (groupCfg->accessMode != ADC_ACCESS_MODE_STREAMING)
+        return E_NOT_OK;
 
-        // Kiểm tra buffer hợp lệ
-        if (adcGroupBuffers[group] == NULL_PTR)
-            return E_NOT_OK;
+    // Kiểm tra buffer hợp lệ
+    if (adcGroupBuffers[group] == NULL_PTR)
+        return E_NOT_OK;
 
-        // Trả về con trỏ đến phần tử cuối cùng đã ghi (dựa vào chỉ số hiện tại)
-        *PtrToSamplePtr = &adcGroupBuffers[group][adcSampleIndex[group]];
+    // Trả về con trỏ đến phần tử cuối cùng đã ghi (dựa vào chỉ số hiện tại)
+    *PtrToSamplePtr = &adcGroupBuffers[group][adcSampleIndex[group]];
 
-        return E_OK;
-    }
+    return E_OK;
+}
 
-    /*******************************************************************************
-     * @brief   Cho phép trigger bằng phần cứng cho group
-     * @param   group   Group cần bật HW trigger
-     ******************************************************************************/
-    void Adc_EnableHardwareTrigger(Adc_GroupType group)
-    {
-    }
+/*******************************************************************************
+ * @brief   Cho phép trigger bằng phần cứng cho group
+ * @param   group   Group cần bật HW trigger
+ ******************************************************************************/
+void Adc_EnableHardwareTrigger(Adc_GroupType group)
+{
+}
 
-    /*******************************************************************************
-     * @brief   Tắt trigger phần cứng cho group
-     * @param   group   Group cần tắt HW trigger
-     ******************************************************************************/
-    void Adc_DisableHardwareTrigger(Adc_GroupType group)
-    {
-    }
+/*******************************************************************************
+ * @brief   Tắt trigger phần cứng cho group
+ * @param   group   Group cần tắt HW trigger
+ ******************************************************************************/
+void Adc_DisableHardwareTrigger(Adc_GroupType group)
+{
+}
 
-    /*******************************************************************************
-     * @brief   Lấy thông tin phiên bản của driver
-     * @param   versioninfo   Con trỏ tới struct chứa thông tin version
-     ******************************************************************************/
-    void Adc_GetVersionInfo(Std_VersionInfoType * versioninfo)
-    {
-    }
+/*******************************************************************************
+ * @brief   Lấy thông tin phiên bản của driver
+ * @param   versioninfo   Con trỏ tới struct chứa thông tin version
+ ******************************************************************************/
+void Adc_GetVersionInfo(Std_VersionInfoType *versioninfo)
+{
+}

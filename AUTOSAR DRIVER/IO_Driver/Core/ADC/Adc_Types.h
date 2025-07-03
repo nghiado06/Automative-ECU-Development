@@ -232,6 +232,29 @@ typedef enum
     ADC_HW_TRIG_FALLING
 } Adc_HardwareTriggerSignalType;
 
+/*******************************************************************************
+ * @brief   Kiểm tra xem muốn đọc dữ liệu theo kiểu nào
+ * @details - POLLING: đọc liên tục, treo
+ *          - INTERRUPT: có sử dụng ngắt
+ ******************************************************************************/
+typedef enum
+{
+    ADC_READ_MODE_POLLING,
+    ADC_READ_MODE_INTERRUPT
+} Adc_ReadModeType;
+
+/*******************************************************************************
+ * @brief   Kiểm tra xem có cần sử dụng DMA không
+ * @details - CPU: không dùng DMA
+ *          - INTERRUPT: có sử dụng DMA
+ ******************************************************************************/
+typedef enum
+{
+    ADC_TRANSFER_MODE_CPU,
+    ADC_TRANSFER_MODE_DMA
+
+} Adc_TransferModeType;
+
 /*********************************************************************
  * @brief   Cấu trúc cấu hình cho từng Group ADC
  * @details Mỗi group đại diện cho một tập hợp các channel ADC sẽ được
@@ -283,6 +306,9 @@ typedef struct
     Adc_InputModeType inputMode;
 
     Adc_GroupReplacementType groupReplacement;
+
+    Adc_ReadModeType readMode;
+    Adc_TransferModeType transferMode;
 } Adc_GroupConfigType;
 
 /*******************************************************************************

@@ -46,7 +46,7 @@ const Adc_GroupConfigType AdcGroupConfigs[ADC_MAX_GROUPS] = {
      .triggerSource = ADC_TRIGG_SRC_SW,
      .hwTriggerSignal = ADC_HW_TRIG_RISING,
      .streamBufferMode = ADC_STREAM_BUFFER_LINEAR,
-     .numSamples = 1,
+     .numSamples = ADC_MAX_SAMPLES,
      .notification = NULL_PTR,
      .priority = 0,
      .hwUnit = ADC_1,
@@ -54,7 +54,9 @@ const Adc_GroupConfigType AdcGroupConfigs[ADC_MAX_GROUPS] = {
      .samplingTime = ADC_SAMPLINGTIME_28CYCLES5,
      .resolution = ADC_RESOLUTION_12,
      .inputMode = ADC_SINGLE_ENDED,
-     .groupReplacement = ADC_REPL_SKIP}};
+     .groupReplacement = ADC_REPL_SKIP,
+     .readMode = ADC_READ_MODE_POLLING,
+     .transferMode = ADC_TRANSFER_MODE_CPU}};
 
 /*******************************************************************************
  * @brief   Cấu hình tổng ADC sử dụng thực tế
@@ -92,7 +94,9 @@ const Adc_GroupConfigType AdcGroupConfigDefault[] = {
      .samplingTime = ADC_SAMPLINGTIME_1CYCLE5,
      .resolution = ADC_RESOLUTION_12,
      .inputMode = ADC_SINGLE_ENDED,
-     .groupReplacement = ADC_REPL_SKIP}};
+     .groupReplacement = ADC_REPL_SKIP,
+     .readMode = ADC_READ_MODE_POLLING,
+     .transferMode = ADC_TRANSFER_MODE_CPU}};
 
 /*******************************************************************************
  * @brief   Cấu hình tổng ADC mặc định (fallback)

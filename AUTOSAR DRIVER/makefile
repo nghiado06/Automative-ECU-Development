@@ -16,6 +16,7 @@ CFLAGS  = -mcpu=cortex-m3 -mthumb -O0 -g -Wall -ffreestanding -nostdlib \
           -I$(CORE_DIR)/DIO \
           -I$(CORE_DIR)/PORT \
           -I$(CORE_DIR)/PWM \
+          -I$(CORE_DIR)/ADC \
           -I$(CORE_DIR) \
           -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER
 

@@ -19,6 +19,8 @@
 #include "Std_Types.h"
 #include "stm32f10x_rcc.h"
 #include "Adc_Cfg.h"
+#include "stm32f10x_dma.h"
+#include "stm32f10x.h"
 
 /********************************************************************
  * ================= [ API FUNCTION DEFINITIONS ] ===================
