@@ -120,7 +120,7 @@ static void Adc_HandleConversionComplete(Adc_GroupType group, uint16 rawValue)
 /*************************************************************************************
  * @brief   Hàm ISR cho ADC
  *************************************************************************************/
-static void ADC_1_2_IRQHandler(void)
+static void ADC1_2_IRQHandler(void)
 {
     if (ADC_GetITStatus(ADC1, ADC_IT_EOC))
     {
@@ -177,7 +177,39 @@ static void Adc_Dma_Config(Adc_GroupType group)
     DMA_Init(DMA1_Channel1, &DMA_InitStructure);
 
     DMA_Cmd(DMA1_Channel1, ENABLE);
+
     ADC_DMACmd(adc, ENABLE);
+
+    NVIC_EnableIRQ(DMA1_Channel1_IRQn); // Bật ngắt DMA
+
+    DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, ENABLE); // Bật ngắt chuyển hoàn thành
+}
+
+static void DMA1_Channel1_IRQHandler(void)
+{
+    // Kiểm tra xem DMA đã hoàn thành chuyển đổi chưa
+    if (DMA_GetITStatus(DMA1_IT_TC1))
+    {
+        DMA_ClearITPendingBit(DMA1_IT_TC1);
+
+        DMA_Cmd(DMA1_Channel1, DISABLE); // Dừng DMA
+
+        ADC_DMACmd(ADC1, DISABLE); // Dừng ADC DMA
+
+        // Giả sử group 0 đang sử dụng DMA1_Channel1
+        Adc_GroupType group = adcActiveGroupId[ADC_1];
+        if (group != ADC_INVALID_GROUP)
+        {
+            adcGroupStatus[group] = ADC_COMPLETED;
+
+            // Gọi callback nếu có
+            const Adc_GroupConfigType *cfg = &Adc_Config.groupConfigPtr[group];
+            if (adcGroupNotificationEnabled[group] && cfg->notification != NULL_PTR)
+            {
+                cfg->notification();
+            }
+        }
+    }
 }
 
 /*************************************************************************************

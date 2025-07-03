@@ -31,6 +31,9 @@ g_pfnVectors:
     .word   0                        /* 0x34: Reserved */
     .word   PendSV_Handler          /* 0x38: PendSV Handler */
     .word   SysTick_Handler         /* 0x3C: SysTick Handler */
+    .word   DMA1_Channel1_IRQHandler /* 0x40: DMA Channel 1 Global Interrupt */
+    .word   DMA1_Channel2_IRQHandler     /* 0x50: IRQ12 – DMA1 Channel 2 */
+    .word   ADC1_2_IRQHandler            /* 0x54: IRQ18 – ADC1 and ADC2  */
 
 /* ========= Default Handler (vòng lặp vô hạn) ========= */
     .section .text.Default_Handler, "ax", %progbits
@@ -67,6 +70,17 @@ Default_Handler:
 
     .weak   SysTick_Handler
     .set    SysTick_Handler, Default_Handler
+
+    .weak   DMA1_Channel1_IRQHandler
+    .set    DMA1_Channel1_IRQHandler, Default_Handler
+
+    .weak   DMA1_Channel2_IRQHandler
+    .set    DMA1_Channel2_IRQHandler, Default_Handler
+
+    .weak   ADC1_2_IRQHandler
+    .set    ADC1_2_IRQHandler, Default_Handler
+
+    /* ========= Weak aliases cho tất cả các interrupt handlers ========= */
 
 /* ========= Reset Handler ========= */
     .section .text.Reset_Handler, "ax", %progbits
