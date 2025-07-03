@@ -107,7 +107,7 @@ ADC Driver theo chuẩn AUTOSAR cung cấp một tập các API để quản lý
 
 > **Lưu ý:** Trong chuẩn AUTOSAR, nhiều hàm phải được gọi theo thứ tự bắt buộc để tránh lỗi logic. Ví dụ: `Adc_SetupResultBuffer()` phải được gọi trước `Adc_StartGroupConversion()` nếu sử dụng streaming mode.
 
-# 2. CẤU TRÚC HOẠT ĐỘNG CHI TIẾT
+# Phần 2. Cấu trúc Hoạt động chi tiết
 
 ## 2.1 Phân tích chế độ Streaming và One-shot trong ADC Driver
 
@@ -224,6 +224,8 @@ ADC Driver theo chuẩn AUTOSAR sử dụng buffer để lưu trữ kết quả 
         +-------------------------------+
 ```
 
+---
+
 ### 5. So sánh cấu trúc với Polling và DMA
 
 | Cách truyền kết quả    | Cần buffer không? | Ai điều khiển việc ghi?          | Khi nào ghi vào buffer?                                  |
@@ -231,3 +233,409 @@ ADC Driver theo chuẩn AUTOSAR sử dụng buffer để lưu trữ kết quả 
 | **Polling (thủ công)** | Có                | Người dùng qua `Adc_ReadGroup()` | Sau khi kiểm tra `EOC` và đọc `ADC_GetConversionValue()` |
 | **Interrupt**          | Có                | ISR (trong driver)               | Khi `EOC` interrupt xảy ra                               |
 | **DMA**                | Có                | Bộ DMA hardware                  | Tự động ghi khi mỗi mẫu ADC hoàn thành                   |
+
+## 2.3 Tích hợp ngắt và DMA trong ADC Driver
+
+Trong các hệ thống nhúng thời gian thực, việc tích hợp **ngắt (Interrupt)** và **DMA (Direct Memory Access)** giúp nâng cao hiệu suất đọc ADC, giảm tải CPU, và tối ưu hóa luồng dữ liệu. Phần này phân tích bản chất, cách triển khai và mối liên hệ của hai cơ chế trên trong ADC Driver chuẩn AUTOSAR.
+
+---
+
+### 1. **Ngắt (Interrupt-based conversion)**
+
+| Mục                | Mô tả                                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **Ý nghĩa**        | Cho phép ADC tự động thông báo cho CPU (qua ngắt) khi đã có kết quả chuyển đổi. CPU không cần polling.                    |
+| **Cách hoạt động** | Sau khi ADC hoàn thành 1 mẫu (EOC – End of Conversion), cờ EOC được set và ISR (Interrupt Service Routine) sẽ được gọi.   |
+| **Ứng dụng**       | Phù hợp các hệ thống yêu cầu phản hồi nhanh mà vẫn tiết kiệm CPU, ví dụ cảnh báo ngưỡng, thu thập dữ liệu không liên tục. |
+
+#### Phân tích triển khai:
+
+- Cần bật `ADC_IT_EOC` bằng `ADC_ITConfig(...)`.
+- Cấu hình `NVIC` để bật ngắt ADC1_2.
+- ISR xác định `groupId` đang hoạt động bằng biến toàn cục `adcActiveGroupId[]`.
+- ISR gọi `Adc_HandleConversionComplete(groupId, rawValue)` để xử lý lưu buffer + gọi callback.
+
+```c
+// Trong ADC ISR:
+if (ADC_GetITStatus(ADC1, ADC_IT_EOC)) {
+    Adc_HandleConversionComplete(groupId, ADC_GetConversionValue(ADC1));
+}
+```
+
+---
+
+### 2. **DMA (Direct Memory Access)**
+
+| Mục                | Mô tả                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| **Ý nghĩa**        | DMA cho phép phần cứng ADC ghi trực tiếp dữ liệu vào bộ nhớ mà không cần CPU can thiệp từng mẫu.               |
+| **Cách hoạt động** | ADC sau khi chuyển đổi sẽ tự động đẩy kết quả vào buffer qua DMA channel. CPU chỉ cần xử lý kết quả cuối cùng. |
+| **Ứng dụng**       | Rất phù hợp với STREAMING hoặc multi-channel sampling – giảm tải CPU, tăng throughput.                         |
+
+#### Phân tích triển khai:
+
+- Cần bật clock cho DMA1 (`RCC_AHBPeriph_DMA1`).
+- Gán DMA_MemoryBaseAddr là buffer riêng của `group`:
+  ```c
+  DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)adcGroupBuffers[group];
+  ```
+- Gán PeripheralBaseAddr là thanh ghi `ADCx->DR`.
+- Bật `ADC_DMACmd(adc, ENABLE)` để cho phép ADC sử dụng DMA.
+- Không cần polling hoặc ISR, chỉ cần đọc buffer khi đủ mẫu.
+
+---
+
+### So sánh ngắt và DMA:
+
+| Tiêu chí                | Ngắt                           | DMA                                   |
+| ----------------------- | ------------------------------ | ------------------------------------- |
+| Cần CPU xử lý từng mẫu? | Có (ISR gọi mỗi lần EOC)       | Không (tự động ghi vào RAM)           |
+| Phù hợp với             | Oneshot, low-sample apps       | Streaming, high-speed sampling        |
+| Phức tạp cài đặt        | Trung bình                     | Cao hơn (cần DMA + cấu hình chi tiết) |
+| Sử dụng RAM             | Ít hơn (có thể xử lý từng mẫu) | Nhiều hơn (phải cấp sẵn buffer lớn)   |
+
+---
+
+### Mối liên hệ với AUTOSAR
+
+AUTOSAR cho phép cấu hình **Read Mode** và **Transfer Mode** trong mỗi `Adc_GroupConfigType` để chọn giữa:
+
+- `Adc_ReadModeType` = `ADC_READ_MODE_POLLING` hoặc `ADC_READ_MODE_INTERRUPT`
+- `Adc_TransferModeType` = `ADC_TRANSFER_MODE_DIRECT` hoặc `ADC_TRANSFER_MODE_DMA`
+
+Điều này cho phép mở rộng driver linh hoạt, không cần thay đổi lõi API.
+
+
+# 3. Luồng hoạt động API
+
+## 3.1. Luồng hoạt động tổng thể của ADC Driver
+
+ADC Driver theo chuẩn AUTOSAR hoạt động theo mô hình định hướng cấu hình (configuration-based), nơi mà tất cả các thông tin như trigger, buffer, số kênh... đều được định nghĩa trước trong file cấu hình. Sau đó, các API được gọi tuần tự để điều khiển quá trình chuyển đổi ADC. Phần này trình bày luồng tổng thể từ khởi tạo đến kết thúc một chu kỳ đọc dữ liệu, kèm sơ đồ minh họa rõ ràng.
+
+---
+
+### 1. Khởi tạo – `Adc_Init()`
+
+**Mục đích:**
+- Bật clock ADCx, thực hiện reset + calibration
+- Thiết lập các thông số phần cứng như scan mode, trigger, số channel, chế độ chuyển đổi (one-shot/continuous)
+
+**Luồng thực hiện:**
+```
+User → Adc_Init(&Adc_Config) 
+    └─> Vòng lặp qua từng group trong Config
+           └─> Cấu hình ADCx (ADC_Init)
+           └─> Bật ADC + thực hiện Calibration
+```
+
+---
+
+### 2. Thiết lập buffer – `Adc_SetupResultBuffer()`
+
+**Mục đích:**
+- Gán con trỏ buffer mà kết quả ADC sẽ được lưu vào
+- Phân biệt rõ từng group có vùng nhớ riêng
+
+**Luồng:**
+```
+User → Adc_SetupResultBuffer(group, bufferPtr)
+    └─> adcGroupBuffers[group] = bufferPtr
+```
+
+---
+
+### 3. Bắt đầu chuyển đổi – `Adc_StartGroupConversion()`
+
+**Mục đích:**
+- Cấu hình danh sách kênh cho ADC
+- Bắt đầu trigger (phần mềm hoặc phần cứng)
+- Nếu có interrupt hoặc DMA thì khởi động tương ứng
+
+**Luồng:**
+```
+User → Adc_StartGroupConversion(group)
+    ├─> Gán activeGroupId
+    ├─> Cấu hình channelList cho ADCx
+    ├─> Nếu dùng DMA → gọi Adc_Dma_Config()
+    ├─> Nếu dùng Interrupt → gọi Adc_Nvic_Config()
+    └─> ADC_SoftwareStartConvCmd(ENABLE)
+```
+
+---
+
+### 4. Trong quá trình chuyển đổi:
+
+#### Trường hợp 1: Dùng Interrupt
+- Mỗi lần ADC hoàn tất 1 mẫu → ngắt xảy ra
+- Hàm ISR gọi `Adc_HandleConversionComplete()`
+- Ghi vào buffer, tăng sampleIndex, gọi callback nếu xong
+
+```
+EOC → ISR → Adc_HandleConversionComplete(group, value)
+    ├─> Ghi buffer
+    ├─> Kiểm tra đủ mẫu → gọi callback (nếu bật)
+```
+
+#### Trường hợp 2: Dùng DMA
+- DMA tự động copy giá trị từ ADC_DR → buffer
+- Người dùng có thể kiểm tra số mẫu đầy theo cơ chế riêng (flag, polling hoặc callback từ DMA)
+
+---
+
+### 5. Đọc dữ liệu – `Adc_ReadGroup()`
+
+**Mục đích:**
+- Đọc dữ liệu (nếu không dùng interrupt/DMA)
+- Được gọi thủ công bởi ứng dụng
+
+**Luồng:**
+```
+User → Adc_ReadGroup(group, bufferPtr)
+    ├─> Đọc từng giá trị từ ADC_GetConversionValue
+    └─> Gọi Adc_HandleConversionComplete() cho mỗi giá trị
+```
+
+---
+
+### 6. Dừng chuyển đổi – `Adc_StopGroupConversion()`
+
+**Mục đích:** Dừng phần cứng ADC và cập nhật trạng thái
+```
+User → Adc_StopGroupConversion(group)
+    └─> ADC_SoftwareStartConvCmd(DISABLE)
+    └─> Status = IDLE
+```
+
+---
+
+### 7. Callback (nếu enable notification)
+Nếu người dùng bật notification bằng:
+```c
+Adc_EnableGroupNotification(group);
+```
+→ thì `Adc_HandleConversionComplete()` sẽ gọi hàm `notification()` được định nghĩa trong cấu hình sau khi group hoàn tất lấy đủ mẫu.
+
+---
+
+## Sơ đồ tổng quát
+
+```
++-------------+         +------------------------+         +-----------------+
+| Adc_Init()  | ----->  | Adc_SetupResultBuffer()| ----->  | Adc_StartGroupConversion() |
++-------------+         +------------------------+         +-----------------+
+                                                                |
+                                                      ┌─────────┴──────────────┐
+                                                      ▼                        ▼
+                                            +-------------------+    +-------------------+
+                                            | Adc_Nvic_Config() |    | Adc_Dma_Config()  |
+                                            +-------------------+    +-------------------+
+                                                      |
+                                              +-------------------+
+                                              | Conversion Ongoing |
+                                              +-------------------+
+                                                      |
+                                       +-------------------------------+
+                                       | ISR → Adc_HandleConversion... |
+                                       +-------------------------------+
+                                                      |
+                                     ┌──────────────┬───────────────┐
+                                     ▼              ▼               ▼
+                            Ghi buffer    Check sampleCount    Gọi callback
+```
+
+---
+
+
+
+## 3.2 – Phân tích chi tiết từng nhánh luồng theo cấu hình
+
+Sau khi đã trình bày tổng thể luồng hoạt động ADC Driver, phần này đi sâu vào phân tích từng trường hợp cấu hình khác nhau mà driver hỗ trợ, bao gồm:
+
+---
+
+### A. Trường hợp 1 – Chế độ SINGLE + POLLING
+
+| **Đặc điểm** | **Chi tiết**                               |
+| ------------ | ------------------------------------------ |
+| AccessMode   | `ADC_ACCESS_MODE_SINGLE`                   |
+| ConvMode     | `ADC_CONV_MODE_ONE_SHOT` hoặc `CONTINUOUS` |
+| ReadMode     | `POLLING`                                  |
+| Trigger      | Phần mềm (`ADC_TRIGG_SRC_SW`)              |
+| DMA          | Không dùng                                 |
+
+**Luồng hoạt động:**
+
+1. `Adc_Init()` cấu hình ADCx.
+2. `Adc_SetupResultBuffer()` gán buffer cho group.
+3. `Adc_StartGroupConversion(group)`:
+   - Gọi `ADC_SoftwareStartConvCmd(adc, ENABLE)`
+   - Đặt trạng thái group = BUSY.
+4. Trong main loop:
+   - Gọi `Adc_ReadGroup(group, buffer)`:
+     - Polling `ADC_FLAG_EOC`, đọc giá trị.
+     - Ghi vào buffer.
+     - Gọi `Adc_HandleConversionComplete()`.
+5. Trạng thái group chuyển sang `COMPLETED`.
+
+**Phù hợp khi:** cần thao tác đơn giản, ít kênh, không yêu cầu thời gian thực.
+
+---
+
+### B. Trường hợp 2 – Chế độ STREAMING + POLLING
+
+| **Đặc điểm** | **Chi tiết**                |
+| ------------ | --------------------------- |
+| AccessMode   | `ADC_ACCESS_MODE_STREAMING` |
+| ConvMode     | `ADC_CONV_MODE_CONTINUOUS`  |
+| ReadMode     | `POLLING`                   |
+| Trigger      | Phần mềm                    |
+| DMA          | Không dùng                  |
+
+**Luồng hoạt động:**
+
+1. `Adc_Init()`, `Adc_SetupResultBuffer()`, `Adc_StartGroupConversion(group)`
+2. Trong main loop:
+   - Lặp nhiều lần `Adc_ReadGroup()`, mỗi lần ghi vào `adcGroupBuffers[group][adcSampleIndex[group]]`
+   - Tăng `adcSampleIndex`, so sánh với `numSamples`.
+3. Khi đủ mẫu:
+   - Dừng chuyển đổi.
+   - Trạng thái `COMPLETED`, gọi callback nếu có.
+
+**Phù hợp khi:** cần lấy liên tục nhiều mẫu nhưng không muốn dùng interrupt.
+
+---
+
+### C. Trường hợp 3 – STREAMING hoặc SINGLE + INTERRUPT
+
+| **Đặc điểm** | **Chi tiết** |
+| ------------ | ------------ |
+| ReadMode     | `INTERRUPT`  |
+| DMA          | Không dùng   |
+
+**Luồng hoạt động:**
+
+1. `Adc_StartGroupConversion()`:
+   - Gọi `ADC_ITConfig()`, cấu hình NVIC.
+2. Khi chuyển đổi xong:
+   - `ISR` được gọi (`ADC_1_2_IRQHandler`)
+   - Gọi `Adc_HandleConversionComplete(group, value)`:
+     - Ghi vào buffer.
+     - Tăng index.
+     - Nếu đủ mẫu → dừng, cập nhật trạng thái, gọi callback.
+
+**Ưu điểm:** không chiếm CPU, phù hợp real-time system.
+
+---
+
+### D. Trường hợp 4 – STREAMING + DMA
+
+| **Đặc điểm** | **Chi tiết**                     |
+| ------------ | -------------------------------- |
+| AccessMode   | `STREAMING`                      |
+| TransferMode | `DMA`                            |
+| ReadMode     | Không cần quan tâm (DMA tự động) |
+
+**Luồng hoạt động:**
+
+1. `Adc_StartGroupConversion()`:
+   - Gọi `Adc_Dma_Config(group)`
+   - Gán địa chỉ `adcGroupBuffers[group]` vào DMA.
+   - Gọi `ADC_DMACmd(adc, ENABLE)`.
+2. DMA sẽ tự động ghi dữ liệu vào buffer.
+3. Khi đủ mẫu (hoặc dùng DMA interrupt):
+   - Gọi callback từ ISR của DMA hoặc kiểm tra số lượng mẫu.
+
+**Ưu điểm:** hiệu suất cao, không chiếm CPU, dùng cho hệ thống nhiều mẫu/ tốc độ cao.
+
+---
+
+### Tổng kết phân nhánh luồng
+
+| Chế độ        | ReadMode  | Phương pháp đọc          | Ghi chú                |
+| ------------- | --------- | ------------------------ | ---------------------- |
+| SINGLE        | POLLING   | `Adc_ReadGroup` thủ công | Đơn giản, dễ dùng      |
+| STREAM        | POLLING   | `ReadGroup` nhiều lần    | Đủ mẫu thì tự dừng     |
+| SINGLE/STREAM | INTERRUPT | ISR tự xử lý             | Tốt cho thời gian thực |
+| STREAM        | DMA       | Không cần gọi hàm đọc    | Tối ưu hiệu năng       |
+
+---
+
+# 4. Tổng kết và ví dụ thực tiễn
+
+## 4.1 Tổng kết kiến thức chính
+
+| Mục tiêu học                              | Nội dung tóm tắt                                                                                                                                                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Hiểu cấu trúc driver**                  | Driver ADC chia thành nhiều group độc lập, mỗi group có thể tùy chỉnh danh sách channel, trigger, mode đọc, số mẫu,…                                                                                        |
+| **Nắm được các mode chính**               | Oneshot – đọc 1 lần; Streaming – đọc liên tục; Continuous – tự động lặp lại; Trigger từ SW/HW                                                                                                               |
+| **Phân biệt luồng Polling/Interrupt/DMA** | Polling: người dùng gọi `Adc_ReadGroup()` để lấy dữ liệu. <br> Interrupt: tự ngắt sau mỗi lần đọc xong và gọi callback. <br> DMA: tự động lưu vào buffer sau mỗi lần chuyển đổi mà không cần CPU can thiệp. |
+| **Sử dụng buffer hiệu quả**               | Mỗi group cần gán buffer trước bằng `Adc_SetupResultBuffer()` để có nơi lưu dữ liệu. Buffer cần đủ dung lượng = số channel × số mẫu.                                                                        |
+| **Hiểu luồng thực thi API**               | Init → SetupBuffer → StartGroupConversion → [chuyển đổi/ghi dữ liệu] → [callback hoặc đọc thủ công] → Stop hoặc lặp lại                                                                                     |
+
+## 4.2 Ví dụ ứng dụng thực tế
+
+### Bài toán: Giám sát điện áp pin trong robot
+
+**Yêu cầu**:
+
+- Đọc điện áp từ 2 pin (ADC_Channel_0 và ADC_Channel_1)
+- Đọc mỗi 5ms (sử dụng timer trigger)
+- Lưu liên tục 10 mẫu gần nhất để phân tích trung bình
+- Sử dụng DMA để giảm tải CPU
+- Callback sau mỗi 10 mẫu để tính toán điện áp trung bình
+
+**Cấu hình** `Adc_GroupConfigType`:
+
+```c
+static const Adc_ChannelType batMonitorChannels[] = {ADC_CHANNEL_0, ADC_CHANNEL_1};
+
+const Adc_GroupConfigType AdcGroup_BatteryMonitor = {
+    .groupId = 0,
+    .channelList = batMonitorChannels,
+    .numberOfChannels = 2,
+    .conversionMode = ADC_CONV_MODE_CONTINUOUS,
+    .accessMode = ADC_ACCESS_MODE_STREAMING,
+    .triggerSource = ADC_TRIGG_SRC_HW,
+    .hwTriggerSignal = ADC_HW_TRIG_RISING,
+    .streamBufferMode = ADC_STREAM_BUFFER_LINEAR,
+    .numSamples = 10,
+    .notification = BatteryMonitor_Callback,
+    .priority = 1,
+    .hwUnit = ADC_1,
+    .refVoltage = ADC_REF_VOLTAGE_DEFAULT,
+    .samplingTime = ADC_SAMPLE_TIME_28CYCLES,
+    .resolution = ADC_RES_12BIT,
+    .inputMode = ADC_INPUT_SINGLE_ENDED,
+    .groupReplacement = ADC_GROUP_REPL_ABORT_RESTART,
+    .readMode = ADC_READ_MODE_INTERRUPT,
+    .transferMode = ADC_TRANSFER_MODE_DMA
+};
+```
+
+**Hàm callback**:
+
+```c
+void BatteryMonitor_Callback(void) {
+    Adc_ValueGroupType *buffer;
+    if (Adc_GetStreamLastPointer(0, &buffer) == E_OK) {
+        float avg0 = 0, avg1 = 0;
+        for (int i = 0; i < 10; i++) {
+            avg0 += buffer[i * 2];
+            avg1 += buffer[i * 2 + 1];
+        }
+        avg0 /= 10.0;
+        avg1 /= 10.0;
+
+        // Cập nhật hệ thống hoặc báo hiệu nếu pin thấp
+    }
+}
+```
+
+## 4.3 Gợi ý mở rộng
+
+| Hướng mở rộng                             | Ý tưởng                                                               |
+| ----------------------------------------- | --------------------------------------------------------------------- |
+| **Tối ưu bộ nhớ**                         | Dùng buffer dạng vòng để lưu liên tục nhưng tiết kiệm RAM.            |
+| **Tích hợp vào hệ thống RTOS**            | Callback có thể sử dụng semaphore hoặc queue để gửi dữ liệu cho task. |
+| **Chuyển sang dùng DMA ngắt cuối chu kỳ** | Giúp cập nhật dữ liệu song song với CPU.                              |
+| **Kết hợp nhiều group đồng thời**         | Tăng khả năng đo đa dạng sensor với thời gian khác nhau.              |
