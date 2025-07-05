@@ -1,38 +1,15 @@
-# 🚗 Automotive ECU Development with STM32F1
+# 🚗 Automotive ECU Development with STM32F1 – AUTOSAR Style
 
 ## 📌 Giới thiệu
 
-Xin chào! Đây là nơi mình chia sẻ toàn bộ kiến thức đã học và tổng hợp được trong quá trình **lập trình trên dòng vi điều khiển STM32F1x**, đặc biệt trong bối cảnh **phát triển ECU (Electronic Control Unit)** cho các ứng dụng automotive.
+Chào bạn! Đây là nơi mình chia sẻ hành trình phát triển phần mềm nhúng trên **vi điều khiển STM32F1**, với định hướng áp dụng **chuẩn kiến trúc AUTOSAR Classic Platform** – một chuẩn công nghiệp quan trọng trong lĩnh vực Automotive.
 
-Mục tiêu của repo là giúp sinh viên và người mới bắt đầu hiểu rõ cách làm việc với **các tầng thấp (bare-metal)** cũng như **chuẩn hóa phần mềm theo AUTOSAR**.
+Mục tiêu chính của repo là hiện thực các **driver cơ bản** như `IO Driver` `Communication Driver`,... theo **chuẩn hóa phần mềm AUTOSAR**, bao gồm naming convention, layered architecture, separation of configuration/code/data, và tuân thủ các guideline phát triển phần mềm nhúng chuyên nghiệp.
 
----
+Mình sẽ không còn tập trung vào các hình thức lập trình trực tiếp thanh ghi hoặc sử dụng SPL như trước nữa, mà chuyển sang xây dựng hệ thống driver có tổ chức rõ ràng, phục vụ cho việc phát triển ECU thực tế và mở rộng dễ dàng trong tương lai.
 
-## 📚 Nội dung chính
-
-### 1. 🧱 Lập trình thanh ghi (Register-Level Programming)
-- Hiểu cấu trúc bộ nhớ, thanh ghi ngoại vi
-- Bitwise manipulation – thao tác bit/byte hiệu quả
-- Thực hành bật/tắt LED, đọc button bằng thanh ghi trực tiếp
-
-### 2. 🔧 Sử dụng SPL (Standard Peripheral Library)
-- Cách dùng thư viện chính thức của ST cho STM32F1
-- So sánh giữa SPL và thanh ghi thuần
-- Viết code theo chuẩn dễ bảo trì và mở rộng
-
-### 3. 🧩 AUTOSAR Classic Platform
-- Kiến trúc phần mềm AUTOSAR và khái niệm tầng mềm ECU
-- Các module cơ bản như Port, Dio, Pwm, Adc, Gpt
-- Cách viết code theo guideline AUTOSAR (naming, layered structure,...)
-- Tạo các driver đơn giản theo chuẩn AUTOSAR
+Hy vọng repo sẽ hữu ích cho những bạn đang tìm hiểu AUTOSAR hoặc muốn rèn luyện phong cách lập trình công nghiệp với nền tảng vi điều khiển phổ biến như STM32F1.
 
 ---
 
-## 🛠️ Yêu cầu phần mềm
-
-- **Toolchain**: ARM GCC / Keil uVision / STM32CubeIDE
-- **Board**: STM32F103C8T6 (hoặc tương đương dòng F1)
-- **Thư viện**: SPL (Standard Peripheral Library)
-
----
-
+> ✨ Mọi góp ý, đóng góp hoặc thảo luận đều được hoan nghênh!

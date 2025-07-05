@@ -31,7 +31,7 @@ Trong các hệ thống nhúng (embedded), việc trẫn hoá ADC là cần thi�
   - Đánh giá driver
   - 3 ví dụ ứng dụng thực tế
 
-Và để cho các bạn có thể nẵm kỹ hơn về adc các bạn có thể đọc kỹ hơn về ADC ở đây [ADC_SPL](../../../../STM32_SPL_Programming/ADC/ADC.md).
+Và để cho các bạn có thể nẵm kỹ hơn về adc các bạn có thể đọc kỹ hơn về ADC ở đây [ADC_SPL](https://github.com/nghiado06/MCU-Development/blob/59b792a615c73268698e68f86cfd9cc52224b2e9/STM32_SPL_Programming/ADC/ADC.md#L1).
 
 ---
 
