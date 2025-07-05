@@ -23,6 +23,7 @@
 #include "stm32f10x_adc.h"
 
 #define ADC_MAX_GROUPS 10
+#define ADC_MAX_SAMPLES 5
 
 /*******************************************************************************
  * @brief   Danh sách channel giả dùng cho cấu hình mặc định
