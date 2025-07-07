@@ -3,11 +3,11 @@
  * @author  Do Duc Nghia
  * @brief   ADC Driver Configuration Header File
  * @details File này khai báo các cấu hình compile-time và link-time cho ADC Driver,
- *          bao gồm khai báo danh sách channel, cấu hình group ADC, và cấu hình mặc định
- *          dùng cho hàm khởi tạo (Adc_Init) và hủy khởi tạo (Adc_DeInit).
+ *          bao gồm khai báo danh sách channel, cấu hình group ADC, và cấu hình mặc
+ *          định dùng cho hàm khởi tạo (Adc_Init) và hủy khởi tạo (Adc_DeInit).
  *
- *          Đây là phần cấu hình tĩnh (Link-time Configuration) của module ADC theo chuẩn AUTOSAR,
- *          thường được định nghĩa trong file Adc_Lcfg.c tương ứng.
+ *          Đây là phần cấu hình tĩnh (Link-time Configuration) của module ADC theo
+ *          chuẩn AUTOSAR, thường được định nghĩa trong file Adc_Lcfg.c tương ứng.
  *
  * @version 1.0
  * @date    2025-06-28
