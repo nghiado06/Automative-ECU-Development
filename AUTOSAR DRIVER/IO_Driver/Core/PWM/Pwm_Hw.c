@@ -21,19 +21,17 @@
  *******************************************************************************/
 void Pwm_Hw_EnableClock(TIM_TypeDef *Timer)
 {
-    switch (Timer)
+    if (Timer == TIM2)
     {
-    case TIM2:
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-        break;
-    case TIM3:
+    }
+    else if (Timer == TIM3)
+    {
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-        break;
-    case TIM4:
+    }
+    else if (Timer == TIM4)
+    {
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
-        break;
-    default:
-        break;
     }
 }
 

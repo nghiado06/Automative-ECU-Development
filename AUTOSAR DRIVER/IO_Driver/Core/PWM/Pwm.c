@@ -38,7 +38,7 @@
  *          toàn bộ các hàm điều khiển PWM để truy cập thông tin kênh, timer,
  *          trạng thái, callback,...
  *******************************************************************************/
-static const Pwm_ConfigType *Pwm_ConfigPtr = NULL;
+static const Pwm_ConfigType *Pwm_ConfigPtr = NULL_PTR;
 
 /*================================================== [ ISR HANDLER ] ==================================================*/
 /*******************************************************************************
@@ -135,7 +135,7 @@ void TIM2_IRQHandler(void)
  *******************************************************************************/
 void Pwm_Init(const Pwm_ConfigType *ConfigPtr)
 {
-    if (ConfigPtr == NULL || ConfigPtr->ChannelConfigs == NULL)
+    if (ConfigPtr == NULL_PTR || ConfigPtr->ChannelConfigs == NULL_PTR)
         return;
 
     Pwm_ConfigPtr = ConfigPtr;
@@ -178,7 +178,7 @@ void Pwm_Init(const Pwm_ConfigType *ConfigPtr)
  *******************************************************************************/
 void Pwm_DeInit(void)
 {
-    if (Pwm_ConfigPtr == NULL || Pwm_ConfigPtr->ChannelConfigs == NULL)
+    if (Pwm_ConfigPtr == NULL_PTR || Pwm_ConfigPtr->ChannelConfigs == NULL_PTR)
         return;
 
     for (uint8 i = 0; i < Pwm_ConfigPtr->NumChannels; ++i)
@@ -211,7 +211,7 @@ void Pwm_DeInit(void)
     }
 
     // 3. Xóa cấu hình đang dùng
-    Pwm_ConfigPtr = NULL;
+    Pwm_ConfigPtr = NULL_PTR;
 }
 
 /*=================================== [ OUTPUT CONTROLLING FUNCTIONS ] ===================================*/
@@ -225,11 +225,11 @@ void Pwm_DeInit(void)
  *******************************************************************************/
 void Pwm_SetDutyCycle(Pwm_ChannelType ChannelNumber, Pwm_ValueType DutyCycle)
 {
-    if (Pwm_ConfigPtr == NULL || ChannelNumber >= Pwm_ConfigPtr->NumChannels)
+    if (Pwm_ConfigPtr == NULL_PTR || ChannelNumber >= Pwm_ConfigPtr->NumChannels)
         return;
 
     const Pwm_ChannelConfigType *chCfg = &Pwm_ConfigPtr->ChannelConfigs[ChannelNumber];
-    uint16_t period = TIM_GetAutoReload(chCfg->TimerInstance);
+    uint16_t period = TIM_GetAutoreload(chCfg->TimerInstance);
 
     // Tính toán giá trị CCR mới (theo duty scale 0 – PWM_MAX_DUTY_CYCLE)
     uint16_t compare = (DutyCycle * period) / PWM_MAX_DUTY_CYCLE;
@@ -272,7 +272,7 @@ void Pwm_SetDutyCycle(Pwm_ChannelType ChannelNumber, Pwm_ValueType DutyCycle)
  *******************************************************************************/
 void Pwm_SetPeriodAndDuty(Pwm_ChannelType ChannelNumber, Pwm_PeriodType Period, Pwm_ValueType DutyCycle)
 {
-    if (Pwm_ConfigPtr == NULL || ChannelNumber >= Pwm_ConfigPtr->NumChannels)
+    if (Pwm_ConfigPtr == NULL_PTR || ChannelNumber >= Pwm_ConfigPtr->NumChannels)
         return;
 
     const Pwm_ChannelConfigType *chCfg = &Pwm_ConfigPtr->ChannelConfigs[ChannelNumber];
@@ -324,10 +324,10 @@ void Pwm_SetPeriodAndDuty(Pwm_ChannelType ChannelNumber, Pwm_PeriodType Period, 
  *******************************************************************************/
 void Pwm_SetOutputToIdle(Pwm_ChannelType ChannelNumber)
 {
-    if (ChannelNumber >= PwmConfig.NumChannels)
+    if (ChannelNumber >= Pwm_ConfigPtr->NumChannels)
         return;
 
-    const Pwm_ChannelConfigType *config = &PwmConfig.ChannelConfigs[ChannelNumber];
+    const Pwm_ChannelConfigType *config = &Pwm_ConfigPtr->ChannelConfigs[ChannelNumber];
 
     // Ngừng sinh PWM bằng cách set duty về 0
     switch (config->TimerChannel)
@@ -364,7 +364,7 @@ void Pwm_SetOutputToIdle(Pwm_ChannelType ChannelNumber)
  *******************************************************************************/
 void Pwm_EnableNotification(Pwm_ChannelType ChannelNumber, Pwm_EdgeNotificationType Notification)
 {
-    const Pwm_ChannelConfigType *config = &PwmConfig.ChannelConfigs[ChannelNumber];
+    const Pwm_ChannelConfigType *config = &Pwm_ConfigPtr->ChannelConfigs[ChannelNumber];
 
     // Cập nhật loại cạnh muốn thông báo
     ((Pwm_ChannelConfigType *)config)->NotificationType = Notification;
@@ -417,7 +417,7 @@ void Pwm_EnableNotification(Pwm_ChannelType ChannelNumber, Pwm_EdgeNotificationT
  *******************************************************************************/
 void Pwm_DisableNotification(Pwm_ChannelType ChannelNumber)
 {
-    const Pwm_ChannelConfigType *config = &PwmConfig.ChannelConfigs[ChannelNumber];
+    const Pwm_ChannelConfigType *config = &Pwm_ConfigPtr->ChannelConfigs[ChannelNumber];
     TIM_TypeDef *timer = config->TimerInstance;
     uint8_t channel = config->TimerChannel;
 
@@ -477,7 +477,7 @@ void Pwm_DisableNotification(Pwm_ChannelType ChannelNumber)
  *******************************************************************************/
 Pwm_OutputStateType Pwm_GetOutputState(Pwm_ChannelType ChannelNumber)
 {
-    const Pwm_ChannelConfigType *config = &PwmConfig.ChannelConfigs[ChannelNumber];
+    const Pwm_ChannelConfigType *config = &Pwm_ConfigPtr->ChannelConfigs[ChannelNumber];
     GPIO_TypeDef *gpioPort;
     uint16_t gpioPin;
 

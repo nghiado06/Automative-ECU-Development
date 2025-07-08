@@ -13,7 +13,7 @@
 #define PWM_CFG_H
 
 /*====================================== [INCLUDE LIBRARY] =======================================*/
-#include "Pwm.h"
+#include "Pwm_Types.h"
 #include "stm32f10x.h"
 #include "stm32f10x_tim.h"
 #include "stm32f10x_tim.h"
@@ -39,12 +39,12 @@ void LedBlink_Callback(void);
  * @brief   Mảng cấu hình cho các kênh PWM
  * @note    Được định nghĩa trong file `Pwm_Lcfg.c`
  *******************************************************************************/
-const Pwm_ChannelConfigType PwmChannelConfigs[MAX_CHANNELS];
+extern const Pwm_ChannelConfigType PwmChannelConfigs[MAX_CHANNELS];
 
 /*******************************************************************************
  * @brief   Cấu hình tổng thể cho PWM Driver
  * @note    Bao gồm danh sách các kênh và số lượng kênh, dùng trong `Pwm_Init`
  *******************************************************************************/
-const Pwm_ConfigType PwmConfig;
+extern const Pwm_ConfigType PwmConfig;
 
 #endif
