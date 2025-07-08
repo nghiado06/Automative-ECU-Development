@@ -16,10 +16,17 @@
 #ifndef PWM_H
 #define PWM_H
 
-/*====================== [INCLUDE LIBRARY] ========================*/
+/*====================================== [INCLUDE LIBRARY] =======================================*/
 #include "Std_Types.h"
+#include "Pwm_Cfg.h"
+#include "Pwm_Hw.h"
+#include "stm32f10x.h"
+#include "stm32f10x_tim.h"
+#include "stm32f10x_tim.h"
+#include "stm32f10x_gpio.h"
+#include "stm32f10x_rcc.h"
 
-/*=========================== [MACROS] ============================*/
+/*========================================== [MACROS] ============================================*/
 
 #define PWM_MAX_DUTY_CYCLE ((Pwm_ValueType)0x8000U)                            /**< Giá trị tối đa của duty cycle */
 #define PWM_DUTY_100_PERCENT PWM_MAX_DUTY_CYCLE                                /**< Duty cycle 100% tương ứng với giá trị tối đa */
@@ -28,7 +35,7 @@
 #define PWM_DUTY_25_PERCENT ((Pwm_ValueType)(PWM_MAX_DUTY_CYCLE / 4U))         /**< Duty cycle 25% */
 #define PWM_DUTY_0_PERCENT ((Pwm_ValueType)0U)                                 /**< Duty cycle 0% tương ứng với giá trị 0 */
 
-/*===================== [ EXTENSIVE TYPES ] =======================*/
+/*===================================== [ EXTENSIVE TYPES ] ======================================*/
 
 /******************************************************************************
  * @typedef Pwm_NotificationCallbackType
@@ -81,7 +88,7 @@ typedef enum
     PWM_POLARITY_LOW   /**< Xung bắt đầu bằng mức LOW → lên HIGH */
 } Pwm_PolarityType;
 
-/*================== [AUTOSAR TYPE DEFINITIONS ] ==================*/
+/*================================= [ AUTOSAR TYPE DEFINITIONS ] ======================================*/
 
 /******************************************************************************
  * @typedef Pwm_ChannelType
@@ -150,6 +157,8 @@ typedef enum
  *          prescaler, độ lệch pha, cũng như hàm callback cho cạnh PWM.
  *
  * ChannelId              ID định danh kênh PWM (ví dụ 0, 1, 2...)
+ * TimerInstance          Con trỏ tới instance của Timer (ví dụ TIM2, TIM3...)
+ * TimerChannel           Số kênh của Timer (ví dụ TIM_CHANNEL_1, TIM_CHANNEL_2...)
  * PwmChannelClass        Loại hoạt động: VARIABLE_PERIOD / FIXED_PERIOD / SHIFTED
  * IdleState              Mức logic đầu ra khi kênh bị tắt (LOW hoặc HIGH)
  * NotificationType       Loại cạnh kích hoạt callback (rising / falling / both)
@@ -161,10 +170,14 @@ typedef enum
 typedef struct
 {
     Pwm_ChannelType ChannelId;
+    TIM_TypeDef *TimerInstance;
+    uint8 TimerChannel;
+
     Pwm_ChannelClassType PwmChannelClass;
     Pwm_OutputStateType IdleState;
     Pwm_EdgeNotificationType NotificationType;
     Pwm_PolarityType Polarity;
+
     Pwm_PrescalerType Prescaler;
     Pwm_PhaseShiftType PhaseShift;
     Pwm_NotificationCallbackType NotificationCallback;
@@ -180,6 +193,90 @@ typedef struct
     uint8 NumChannels;                           /**< Số lượng kênh PWM được cấu hình */
 } Pwm_ConfigType;
 
-/*================== [FUNCTION PROTOTYPES] ==================*/
+/*======================================= [ FUNCTION PROTOTYPES ] ========================================*/
+
+/*==================================== [ INITIALIZATION FUNCTIONS ] ======================================*/
+
+/*******************************************************************************
+ * @brief   Khởi tạo PWM Driver
+ * @details Hàm này sẽ khởi tạo tất cả các kênh PWM theo cấu hình tĩnh được
+ *          cung cấp trong tham số `ConfigPtr`. Bao gồm setup timer, chân GPIO,
+ *          prescaler, polarity và trạng thái ban đầu của từng kênh.
+ *
+ * @param   ConfigPtr    Con trỏ trỏ tới cấu trúc Pwm_ConfigType chứa thông tin
+ *                       cấu hình.
+ *******************************************************************************/
+void Pwm_Init(const Pwm_ConfigType *ConfigPtr);
+
+/*******************************************************************************
+ * @brief   Hủy khởi tạo PWM Driver
+ * @details Dừng toàn bộ hoạt động PWM, đưa các chân PWM về trạng thái Idle nếu
+ *          có cấu hình. Sau khi gọi hàm này, tất cả các hàm khác không nên được
+ *          gọi cho đến khi Init lại.
+ *******************************************************************************/
+void Pwm_DeInit(void);
+
+/*=================================== [ OUTPUT CONTROLLING FUNCTIONS ] ===================================*/
+/*******************************************************************************
+ * @brief   Thay đổi duty cycle của một kênh PWM
+ * @details Áp dụng cho cả kênh có chu kỳ cố định (FIXED_PERIOD) hoặc lệch pha.
+ *          Duty cycle được scale từ 0 đến PWM_MAX_DUTY_CYCLE.
+ *
+ * @param   ChannelNumber   ID của kênh PWM cần thay đổi duty
+ * @param   DutyCycle       Giá trị duty cycle mới (0 – PWM_MAX_DUTY_CYCLE)
+ *******************************************************************************/
+void Pwm_SetDutyCycle(Pwm_ChannelType ChannelNumber, Pwm_ValueType DutyCycle);
+
+/*******************************************************************************
+ * @brief   Thay đổi chu kỳ và duty cycle của kênh PWM
+ * @details Chỉ áp dụng cho kênh có class là PWM_VARIABLE_PERIOD. Giúp thay đổi
+ *          cả tần số và độ rộng xung trong runtime.
+ *
+ * @param   ChannelNumber   ID của kênh PWM
+ * @param   Period          Chu kỳ mới (đơn vị tick)
+ * @param   DutyCycle       Giá trị duty cycle tương ứng với chu kỳ
+ *******************************************************************************/
+void Pwm_SetPeriodAndDuty(Pwm_ChannelType ChannelNumber, Pwm_PeriodType Period, Pwm_ValueType DutyCycle);
+
+/*******************************************************************************
+ * @brief   Đặt chân PWM về trạng thái idle
+ * @details Dừng tạo xung PWM bằng cách đưa duty về 0 và đưa mức logic đầu ra
+ *          về trạng thái Idle.
+ *
+ * @param   ChannelNumber   ID của kênh PWM cần set về idle
+ *******************************************************************************/
+void Pwm_SetOutputToIdle(Pwm_ChannelType ChannelNumber);
+
+/*====================================== [ NOTIFICATION FUNCTIONS ] ======================================*/
+
+/*******************************************************************************
+ * @brief   Bật thông báo cạnh cho kênh PWM
+ * @details Khi có cạnh xảy ra trên kênh PWM, hàm callback sẽ được gọi nếu được cấu hình.
+ *          Hàm này cần được gọi sau khi Init nếu muốn dùng callback.
+ *
+ * @param   ChannelNumber   ID của kênh PWM
+ * @param   Notification    Loại cạnh cần kích hoạt thông báo (rising/falling/both)
+ *******************************************************************************/
+void Pwm_EnableNotification(Pwm_ChannelType ChannelNumber, Pwm_EdgeNotificationType Notification);
+
+/*******************************************************************************
+ * @brief   Tắt thông báo cạnh cho kênh PWM
+ * @details Ngừng gọi callback khi có cạnh xảy ra trên kênh PWM.
+ *
+ * @param   ChannelNumber   ID của kênh PWM
+ *******************************************************************************/
+void Pwm_DisableNotification(Pwm_ChannelType ChannelNumber);
+
+/*========================================= [ STATUS FUNCTIONS ] =========================================*/
+
+/*******************************************************************************
+ * @brief   Lấy trạng thái logic hiện tại của chân PWM
+ * @details Hàm này trả về trạng thái mức logic hiện tại (PWM_HIGH hoặc PWM_LOW).
+ *          Kết quả phụ thuộc vào trạng thái chân vật lý và có thể khác nhau tùy MCU.
+ *
+ * @param   ChannelNumber   ID của kênh PWM
+ * @return     Trạng thái hiện tại của chân PWM: PWM_HIGH hoặc PWM_LOW
+ *******************************************************************************/
+Pwm_OutputStateType Pwm_GetOutputState(Pwm_ChannelType ChannelNumber);
 
 #endif
