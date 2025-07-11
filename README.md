@@ -1,15 +1,25 @@
-# 🚗 Automotive ECU Development with STM32F1 – AUTOSAR Style
+# Automotive ECU Development with STM32F1 – AUTOSAR Style
 
-## 📌 Giới thiệu
+## Introduction
 
-Chào bạn! Đây là nơi mình chia sẻ hành trình phát triển phần mềm nhúng trên **vi điều khiển STM32F1**, với định hướng áp dụng **chuẩn kiến trúc AUTOSAR Classic Platform** – một chuẩn công nghiệp quan trọng trong lĩnh vực Automotive.
+Hi there! This repository documents my journey in developing embedded software on **STM32F1 microcontrollers**, with a focus on applying the **AUTOSAR Classic Platform architecture** – a widely adopted industry standard in the automotive domain.
 
-Mục tiêu chính của repo là hiện thực các **driver cơ bản** như `IO Driver` `Communication Driver`,... theo **chuẩn hóa phần mềm AUTOSAR**, bao gồm naming convention, layered architecture, separation of configuration/code/data, và tuân thủ các guideline phát triển phần mềm nhúng chuyên nghiệp.
+The main objective of this repository is to implement **basic drivers** such as `IO Drivers`, `Communication Drivers`, etc., following **AUTOSAR-compliant software structure**. This includes naming conventions, layered architecture, separation of configuration/code/data, and adherence to professional embedded software development guidelines.
 
-Mình sẽ không còn tập trung vào các hình thức lập trình trực tiếp thanh ghi hoặc sử dụng SPL như trước nữa, mà chuyển sang xây dựng hệ thống driver có tổ chức rõ ràng, phục vụ cho việc phát triển ECU thực tế và mở rộng dễ dàng trong tương lai.
+Unlike my previous work, which mainly involved register-level programming or the use of SPL, this project shifts towards building a **well-organized driver system** that is scalable and suitable for real-world ECU development.
 
-Hy vọng repo sẽ hữu ích cho những bạn đang tìm hiểu AUTOSAR hoặc muốn rèn luyện phong cách lập trình công nghiệp với nền tảng vi điều khiển phổ biến như STM32F1.
+I hope this repository will be helpful for those who are exploring AUTOSAR or aiming to practice **industry-grade programming techniques** on a widely-used platform like STM32F1.
 
 ---
 
-> ✨ Mọi góp ý, đóng góp hoặc thảo luận đều được hoan nghênh!
+## Contact & Contribution
+
+If you find this project helpful or would like to contribute, feel free to open issues, pull requests, or just reach out!
+
+- Email: [dungnhannghia2605@gmail.com](mailto:dungnhannghia2605@gmail.com)  
+- GitHub: [@nghiado06](https://github.com/nghiado06)  
+- LinkedIn: [nghiado265](https://www.linkedin.com/in/nghiado265/)
+
+---
+
+> Feedback, contributions, and discussions are always welcome!
